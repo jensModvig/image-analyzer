@@ -6,7 +6,7 @@ class AnalysisTable:
     def __init__(self, parent):
         self.parent = parent
         
-        self.tree = ttk.Treeview(parent, columns=("Property", "Value"), show="tree headings")
+        self.tree = ttk.Treeview(parent, columns=("Property", "Value", "data"), show="tree headings", displaycolumns=("Property", "Value"))
         self.tree.heading("#0", text="", anchor="w")
         self.tree.heading("Property", text="Property")
         self.tree.heading("Value", text="Value")
@@ -24,6 +24,21 @@ class AnalysisTable:
         self.tree.bind("<Double-1>", self._on_double_click)
         self.expanded_items = set()
     
+
+    def _serialize_for_json(self, obj):
+        if isinstance(obj, dict):
+            return {k: self._serialize_for_json(v) for k, v in obj.items()}
+        elif isinstance(obj, (list, tuple)):
+            return [self._serialize_for_json(item) for item in obj]
+        elif hasattr(obj, 'numerator') and hasattr(obj, 'denominator'):
+            return f"{obj.numerator}/{obj.denominator}"
+        else:
+            try:
+                json.dumps(obj)
+                return obj
+            except (TypeError, ValueError):
+                return str(obj)
+    
     def update_properties(self, properties):
         self._clear_table()
         
@@ -31,20 +46,21 @@ class AnalysisTable:
             if is_expandable:
                 item_id = self.tree.insert("", "end", text="▶", 
                                          values=(prop_name, "[Expandable]"))
-                self.tree.set(item_id, "data", json.dumps(value) if not isinstance(value, str) else value)
+                serialized_value = self._serialize_for_json(value)
+                self.tree.set(item_id, "data", json.dumps(serialized_value) if not isinstance(value, str) else value)
             else:
                 self.tree.insert("", "end", text="", values=(prop_name, str(value)))
     
     def _on_double_click(self, event):
         item = self.tree.selection()[0]
         
-        if self.tree.get(item, "text") == "▶":
+        if self.tree.item(item, "text") == "▶":
             self._expand_item(item)
-        elif self.tree.get(item, "text") == "▼":
+        elif self.tree.item(item, "text") == "▼":
             self._collapse_item(item)
     
     def _expand_item(self, item):
-        self.tree.set(item, "text", "▼")
+        self.tree.item(item, text="▼")
         
         try:
             data_str = self.tree.set(item, "data")
@@ -67,7 +83,7 @@ class AnalysisTable:
         self.expanded_items.add(item)
     
     def _collapse_item(self, item):
-        self.tree.set(item, "text", "▶")
+        self.tree.item(item, text="▶")
         
         for child in self.tree.get_children(item):
             self.tree.delete(child)
