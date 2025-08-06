@@ -21,18 +21,11 @@ class ImageContainer:
         if self.channels == 1:
             return ["Gray"]
         elif self.channels == 3:
-            return ["B", "G", "R"]  # OpenCV uses BGR
+            return ["B", "G", "R"]
         elif self.channels == 4:
             return ["B", "G", "R", "A"]
         else:
             return [f"Ch{i}" for i in range(self.channels)]
-    
-    def get_display_image(self):
-        if self.channels == 3:
-            return cv2.cvtColor(self.original, cv2.COLOR_BGR2RGB)
-        elif self.channels == 4:
-            return cv2.cvtColor(self.original, cv2.COLOR_BGRA2RGBA)
-        return self.original
     
     def get_channel(self, index):
         if self.channels == 1:
