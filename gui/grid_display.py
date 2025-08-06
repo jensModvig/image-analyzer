@@ -76,7 +76,8 @@ class GridDisplay:
         return pil_image
     
     def _clear_grid(self):
+        self.images.clear()
         for frame, _, _ in self.labels:
             frame.destroy()
-        self.images.clear()
         self.labels.clear()
+        self.scrollframe.update_idletasks()

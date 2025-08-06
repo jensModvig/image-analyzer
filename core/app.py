@@ -1,5 +1,7 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
+import os
+from tkinterdnd2 import DND_FILES
 from core.image_container import ImageContainer
 from core.module_manager import ModuleManager
 from gui.grid_display import GridDisplay
@@ -11,10 +13,20 @@ class ImageAnalyzerApp:
         self.root.title("Image Analyzer")
         self.root.geometry("1200x800")
         
+        screen_width = self.root.winfo_screenwidth()
+        screen_height = self.root.winfo_screenheight()
+        x = (screen_width - 1200) // 2
+        y = (screen_height - 800) // 2
+        self.root.geometry(f"1200x800+{x}+{y}")
+        
+        self.root.lift()
+        self.root.focus_force()
+        
         self.image_container = None
         self.module_manager = ModuleManager()
         
         self._setup_ui()
+        self._setup_drag_drop()
     
     def _setup_ui(self):
         self.paned_window = ttk.PanedWindow(self.root, orient='vertical')
@@ -37,6 +49,14 @@ class ImageAnalyzerApp:
         file_menu.add_command(label="Open Image", command=self._open_image)
         file_menu.add_separator()
         file_menu.add_command(label="Exit", command=self.root.quit)
+    
+    def _setup_drag_drop(self):
+        self.root.drop_target_register(DND_FILES)
+        self.root.dnd_bind('<<Drop>>', self._on_drop)
+    
+    def _on_drop(self, event):
+        filepath = event.data.strip().strip('{}')
+        self.load_image(filepath)
     
     def _open_image(self):
         from tkinter import filedialog
