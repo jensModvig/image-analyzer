@@ -1,4 +1,3 @@
-import os
 from analysis.base import AnalysisModule
 
 class BasicPropertiesModule(AnalysisModule):
@@ -6,11 +5,13 @@ class BasicPropertiesModule(AnalysisModule):
         image = self.image_container.original
         
         properties = [
+            ("Image Name", self.image_container.filepath.name, False),
+            ("Full Path", self.image_container.filepath, False),
             ("Width", image.shape[1], False),
             ("Height", image.shape[0], False),
             ("Channels", self.image_container.channels, False),
             ("Data Type", str(image.dtype), False),
-            ("File Size", f"{os.path.getsize(self.image_container.filepath)} bytes", False)
+            ("File Size", f"{self.image_container.filepath.stat().st_size} bytes", False)
         ]
         
         return properties

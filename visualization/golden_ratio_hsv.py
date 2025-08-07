@@ -21,15 +21,23 @@ class GoldenRatioHSVModule(VisualizationModule):
         return results
     
     def _create_hsv_mapping(self, channel, unique_values):
-        hsv_colors = generate_golden_ratio_hsv_colors(unique_values)
-        
+        sorted_values = sorted(unique_values)
         output = np.zeros((*channel.shape, 3), dtype=np.uint8)
         
-        for value, hsv_color in zip(unique_values, hsv_colors):
+        for i, value in enumerate(sorted_values):
             mask = channel == value
-            output[mask] = hsv_color
+            if i == 0:
+                output[mask] = (0, 0, 0)  # Black
+            elif i == len(sorted_values) - 1:
+                output[mask] = (255, 255, 255)  # White
+            else:
+                golden_ratio = (1 + 5**0.5) / 2
+                hue = ((i - 1) / golden_ratio) % 1.0
+                hsv = np.array([[[int(hue * 179), 204, 229]]], dtype=np.uint8)
+                rgb = cv2.cvtColor(hsv, cv2.COLOR_HSV2RGB)[0, 0]
+                output[mask] = rgb
         
-        return cv2.cvtColor(output, cv2.COLOR_HSV2RGB)
+        return output
     
     def get_module_name(self):
         return "Golden Ratio HSV"
