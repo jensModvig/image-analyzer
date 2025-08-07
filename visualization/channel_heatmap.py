@@ -13,9 +13,27 @@ class PerChannelHeatmapModule(VisualizationModule):
             heatmap = cv2.applyColorMap(normalized, cv2.COLORMAP_JET)
             heatmap_rgb = cv2.cvtColor(heatmap, cv2.COLOR_BGR2RGB)
             
-            results.append((f"{channel_name} Heatmap", heatmap_rgb))
+            colorbar = self._create_colorbar(channel)
+            combined = np.hstack([heatmap_rgb, colorbar])
+            
+            results.append((f"{channel_name} Heatmap", combined))
         
         return results
+    
+    def _create_colorbar(self, channel):
+        ch_min = np.min(channel)
+        ch_max = np.max(channel)
+        
+        gradient = np.linspace(255, 0, 256, dtype=np.uint8).reshape(256, 1)
+        colorbar = cv2.applyColorMap(gradient, cv2.COLORMAP_JET)
+        colorbar = cv2.cvtColor(colorbar, cv2.COLOR_BGR2RGB)
+        colorbar = np.repeat(colorbar, 30, axis=1)
+        colorbar = cv2.resize(colorbar, (30, channel.shape[0]))
+        
+        cv2.putText(colorbar, f'{ch_max:.1f}', (2, 15), cv2.FONT_HERSHEY_SIMPLEX, 0.3, (255, 255, 255), 1)
+        cv2.putText(colorbar, f'{ch_min:.1f}', (2, channel.shape[0]-5), cv2.FONT_HERSHEY_SIMPLEX, 0.3, (255, 255, 255), 1)
+        
+        return colorbar
     
     def get_module_name(self):
         return "Channel Heatmaps"

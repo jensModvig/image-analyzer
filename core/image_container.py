@@ -11,6 +11,8 @@ class ImageContainer:
         
         self.channels = self._detect_channels()
         self.channel_names = self._get_channel_names()
+        self.data_min = np.min(self.original)
+        self.data_max = np.max(self.original)
         
     def _detect_channels(self):
         if len(self.original.shape) == 2:

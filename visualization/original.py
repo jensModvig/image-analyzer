@@ -7,7 +7,11 @@ class OriginalImageModule(VisualizationModule):
         image = self.image_container.original.copy()
         
         if image.dtype != np.uint8:
-            image = cv2.normalize(image, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U)
+            if np.issubdtype(image.dtype, np.integer):
+                dtype_info = np.iinfo(image.dtype)
+                image = ((image.astype(np.float64) - dtype_info.min) * 255 / (dtype_info.max - dtype_info.min)).astype(np.uint8)
+            else:
+                image = cv2.normalize(image, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U)
         
         if self.image_container.channels == 3:
             image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
