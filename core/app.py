@@ -6,6 +6,7 @@ from core.image_container import ImageContainer
 from core.module_manager import ModuleManager
 from gui.grid_display import GridDisplay
 from gui.analysis_table import AnalysisTable
+from file_loaders import get_all_extensions
 
 class ImageAnalyzerApp:
     def __init__(self, root):
@@ -56,13 +57,15 @@ class ImageAnalyzerApp:
     
     def _on_drop(self, event):
         filepath = event.data.strip().strip('{}')
-        self.load_image(filepath)
+        self.root.after(100, lambda: self.load_image(filepath))
     
     def _open_image(self):
         from tkinter import filedialog
+        extensions = get_all_extensions()
+        ext_pattern = " ".join(f"*{ext}" for ext in extensions)
         filename = filedialog.askopenfilename(
             title="Select Image",
-            filetypes=[("Image files", "*.jpg *.jpeg *.png *.bmp *.tiff *.tif")]
+            filetypes=[("All supported files", ext_pattern)]
         )
         if filename:
             self.load_image(filename)

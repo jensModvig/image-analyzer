@@ -1,13 +1,13 @@
 import cv2
 import numpy as np
 from pathlib import Path
+from file_loaders import get_loader
 
 class ImageContainer:
     def __init__(self, filepath):
         self.filepath = Path(filepath)
-        self.original = cv2.imread(str(self.filepath), cv2.IMREAD_UNCHANGED)
-        if self.original is None:
-            raise ValueError(f"Could not load image: {self.filepath}")
+        loader = get_loader(filepath)
+        self.original = loader.load(filepath)
         
         self.channels = self._detect_channels()
         self.channel_names = self._get_channel_names()
