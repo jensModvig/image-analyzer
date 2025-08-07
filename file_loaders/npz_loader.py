@@ -9,7 +9,7 @@ class NPZLoader(FileLoader):
         selected_key = self._show_array_selector(data)
         if selected_key is None:
             raise ValueError("No array selected")
-        return data[selected_key]
+        return data[selected_key], {'selected_key': selected_key}
     
     @property
     def extensions(self):

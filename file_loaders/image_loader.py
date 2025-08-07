@@ -6,7 +6,7 @@ class ImageLoader(FileLoader):
         image = cv2.imread(str(filepath), cv2.IMREAD_UNCHANGED)
         if image is None:
             raise ValueError(f"Could not load image: {filepath}")
-        return image
+        return image, {}
     
     @property
     def extensions(self):

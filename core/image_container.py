@@ -7,7 +7,7 @@ class ImageContainer:
     def __init__(self, filepath):
         self.filepath = Path(filepath)
         loader = get_loader(filepath)
-        self.original = loader.load(filepath)
+        self.original, self.loader_data = loader.load(filepath)
         
         self.channels = self._detect_channels()
         self.channel_names = self._get_channel_names()

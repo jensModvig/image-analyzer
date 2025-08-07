@@ -6,6 +6,7 @@ from analysis.basic_props import BasicPropertiesModule
 from analysis.channel_stats import ChannelStatsModule
 from analysis.exif_data import EXIFDataModule
 from analysis.color_analysis import ColorAnalysisModule
+from analysis.npz_data import NPZAnalysisModule
 
 class ModuleManager:
     def __init__(self):
@@ -19,7 +20,8 @@ class ModuleManager:
             BasicPropertiesModule,
             ChannelStatsModule,
             EXIFDataModule,
-            ColorAnalysisModule
+            ColorAnalysisModule,
+            NPZAnalysisModule
         ]
     
     def get_visualizations(self, image_container):
