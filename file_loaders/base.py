@@ -9,3 +9,6 @@ class FileLoader(ABC):
     @abstractmethod
     def extensions(self):
         pass
+    
+    def reload_with_stored_params(self, filepath):
+        return self.load(filepath)

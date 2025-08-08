@@ -4,12 +4,28 @@ from tkinter import ttk
 from file_loaders.base import FileLoader
 
 class NPZLoader(FileLoader):
+    def __init__(self):
+        self.selected_key = None
+    
     def load(self, filepath):
         data = np.load(filepath)
-        selected_key = self._show_array_selector(data)
-        if selected_key is None:
+        self.selected_key = self._show_array_selector(data)
+        if self.selected_key is None:
             raise ValueError("No array selected")
-        return data[selected_key], {'selected_key': selected_key}
+        return data[self.selected_key], {'selected_key': self.selected_key}
+    
+    def reload_with_stored_params(self, filepath):
+        if self.selected_key is None:
+            return self.load(filepath)
+        
+        data = np.load(filepath)
+        if self.selected_key not in data:
+            valid_keys = [k for k in data.keys() if self._is_valid_image_array(data[k])]
+            if not valid_keys:
+                raise ValueError(f"No valid image arrays found in {filepath}")
+            self.selected_key = valid_keys[0]
+        
+        return data[self.selected_key], {'selected_key': self.selected_key}
     
     @property
     def extensions(self):

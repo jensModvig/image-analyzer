@@ -4,6 +4,7 @@ import os
 from tkinterdnd2 import DND_FILES
 from core.image_container import ImageContainer
 from core.module_manager import ModuleManager
+from core.file_watcher import FileWatcher
 from gui.grid_display import GridDisplay
 from gui.analysis_table import AnalysisTable
 from file_loaders import get_all_extensions
@@ -25,9 +26,12 @@ class ImageAnalyzerApp:
         
         self.image_container = None
         self.module_manager = ModuleManager()
+        self.file_watcher = FileWatcher(self.root, self._reload_current_file)
         
         self._setup_ui()
         self._setup_drag_drop()
+        
+        self.root.protocol("WM_DELETE_WINDOW", self._on_closing)
     
     def _setup_ui(self):
         self.paned_window = ttk.PanedWindow(self.root, orient='vertical')
@@ -71,8 +75,10 @@ class ImageAnalyzerApp:
             self.load_image(filename)
     
     def load_image(self, filepath):
+        self.file_watcher.stop_watching()
         self.image_container = ImageContainer(filepath)
         self._analyze_image()
+        self.file_watcher.start_watching(self.image_container.filepath)
     
     def _analyze_image(self):
         if not self.image_container:
@@ -83,3 +89,12 @@ class ImageAnalyzerApp:
         
         properties = self.module_manager.get_properties(self.image_container)
         self.analysis_table.update_properties(properties)
+    
+    def _reload_current_file(self):
+        if self.image_container:
+            self.image_container.reload()
+            self._analyze_image()
+    
+    def _on_closing(self):
+        self.file_watcher.stop_watching()
+        self.root.destroy()

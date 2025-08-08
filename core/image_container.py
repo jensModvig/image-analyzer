@@ -6,9 +6,16 @@ from file_loaders import get_loader
 class ImageContainer:
     def __init__(self, filepath):
         self.filepath = Path(filepath)
-        loader = get_loader(filepath)
-        self.original, self.loader_data = loader.load(filepath)
+        self.loader = get_loader(filepath)
+        self.original, self.loader_data = self.loader.load(filepath)
         
+        self.channels = self._detect_channels()
+        self.channel_names = self._get_channel_names()
+        self.data_min = np.min(self.original)
+        self.data_max = np.max(self.original)
+    
+    def reload(self):
+        self.original, self.loader_data = self.loader.reload_with_stored_params(str(self.filepath))
         self.channels = self._detect_channels()
         self.channel_names = self._get_channel_names()
         self.data_min = np.min(self.original)
