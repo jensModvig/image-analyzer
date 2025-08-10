@@ -1,0 +1,16 @@
+name: image-analyzer
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  - opencv
+  - numpy
+  - pillow
+  - scikit-learn
+  - watchdog
+  - pyqt>=6.0
+  - pip
+  - pip:
+    - open3d
+    - pyvista
+    - pyvistaqt

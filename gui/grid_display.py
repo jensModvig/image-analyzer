@@ -1,30 +1,20 @@
-import tkinter as tk
-from tkinter import ttk
+from PyQt6.QtWidgets import QScrollArea, QGridLayout, QLabel, QVBoxLayout, QWidget
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QPixmap, QFont, QImage
 import cv2
 import numpy as np
-from PIL import Image, ImageTk
 import math
 import pyvista as pv
 
-class GridDisplay:
-    def __init__(self, parent):
-        self.parent = parent
-        self.canvas = tk.Canvas(parent, bg='white')
-        self.scrollbar_v = ttk.Scrollbar(parent, orient='vertical', command=self.canvas.yview)
-        self.scrollbar_h = ttk.Scrollbar(parent, orient='horizontal', command=self.canvas.xview)
+class GridDisplay(QScrollArea):
+    def __init__(self):
+        super().__init__()
+        self.setWidgetResizable(True)
         
-        self.canvas.configure(yscrollcommand=self.scrollbar_v.set, 
-                            xscrollcommand=self.scrollbar_h.set)
+        self.scroll_widget = QWidget()
+        self.grid_layout = QGridLayout(self.scroll_widget)
+        self.setWidget(self.scroll_widget)
         
-        self.scrollframe = ttk.Frame(self.canvas)
-        self.canvas.create_window((0, 0), window=self.scrollframe, anchor='nw')
-        
-        self.canvas.pack(side='left', fill='both', expand=True)
-        self.scrollbar_v.pack(side='right', fill='y')
-        self.scrollbar_h.pack(side='bottom', fill='x')
-        
-        self.images = []
-        self.labels = []
         self.plotters = []
         self.vtk_widgets = []
     
@@ -34,72 +24,71 @@ class GridDisplay:
         if not visualizations:
             return
         
-        num_items = len(visualizations)
-        cols = math.ceil(math.sqrt(num_items))
-        rows = math.ceil(num_items / cols)
+        cols = math.ceil(math.sqrt(len(visualizations)))
         
         for i, (title, content) in enumerate(visualizations):
-            row = i // cols
-            col = i % cols
+            container = QWidget()
+            layout = QVBoxLayout(container)
+            layout.setContentsMargins(5, 5, 5, 5)
             
-            frame = ttk.Frame(self.scrollframe)
-            frame.grid(row=row, column=col, padx=5, pady=5, sticky='nsew')
-            
-            title_label = ttk.Label(frame, text=title, font=('Arial', 10, 'bold'))
-            title_label.pack()
+            title_label = QLabel(title)
+            title_label.setFont(QFont("", 0, QFont.Weight.Bold))
+            title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            layout.addWidget(title_label)
             
             if isinstance(content, pv.Plotter):
                 try:
-                    from vtk.tk.vtkTkRenderWindowInteractor import vtkTkRenderWindowInteractor
+                    from pyvistaqt import QtInteractor
                     
-                    vtk_widget = vtkTkRenderWindowInteractor(frame, rw=content.ren_win, width=300, height=300)
-                    vtk_widget.Initialize()
-                    vtk_widget.pack(fill='both', expand=True)
-                    vtk_widget.Start()
+                    vtk_widget = QtInteractor(container)
+                    vtk_widget.setFixedSize(300, 300)
                     
-                    content.render()
+                    for actor in content.renderer.actors.values():
+                        vtk_widget.add_actor(actor)
+                    
+                    vtk_widget.camera = content.camera
+                    vtk_widget.reset_camera()
+                    
+                    layout.addWidget(vtk_widget)
                     
                     self.plotters.append(content)
                     self.vtk_widgets.append(vtk_widget)
-                    self.labels.append((frame, title_label, vtk_widget))
+                    
                 except ImportError:
-                    error_label = ttk.Label(frame, text="VTK Tkinter support not available")
-                    error_label.pack()
-                    self.labels.append((frame, title_label, error_label))
+                    error_label = QLabel("PyVistaQt not available")
+                    error_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                    layout.addWidget(error_label)
             else:
-                display_image = self._prepare_image_for_display(content, 300)
-                photo = ImageTk.PhotoImage(display_image)
-                image_label = ttk.Label(frame, image=photo)
-                image_label.pack()
-                self.images.append(photo)
-                self.labels.append((frame, title_label, image_label))
-        
-        self.scrollframe.update_idletasks()
-        self.canvas.configure(scrollregion=self.canvas.bbox('all'))
+                pixmap = self._cv2_to_pixmap(content, 300)
+                image_label = QLabel()
+                image_label.setPixmap(pixmap)
+                image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                layout.addWidget(image_label)
+            
+            self.grid_layout.addWidget(container, i // cols, i % cols)
     
-    def _prepare_image_for_display(self, cv2_image, max_size):
+    def _cv2_to_pixmap(self, cv2_image, max_size):
         height, width = cv2_image.shape[:2]
         
         if width > max_size or height > max_size:
             scale = min(max_size / width, max_size / height)
-            new_width = int(width * scale)
-            new_height = int(height * scale)
-            cv2_image = cv2.resize(cv2_image, (new_width, new_height))
+            cv2_image = cv2.resize(cv2_image, (int(width * scale), int(height * scale)))
+            height, width = cv2_image.shape[:2]
         
         if len(cv2_image.shape) == 3:
-            pil_image = Image.fromarray(cv2_image)
+            bytes_per_line = 3 * width
+            q_image = QImage(cv2_image.data, width, height, bytes_per_line, QImage.Format.Format_RGB888)
         else:
-            pil_image = Image.fromarray(cv2_image, mode='L')
+            bytes_per_line = width
+            q_image = QImage(cv2_image.data, width, height, bytes_per_line, QImage.Format.Format_Grayscale8)
         
-        return pil_image
+        return QPixmap.fromImage(q_image)
     
     def _clear_grid(self):
-        self.images.clear()
         for plotter in self.plotters:
             plotter.close()
         self.plotters.clear()
         self.vtk_widgets.clear()
-        for frame, _, _ in self.labels:
-            frame.destroy()
-        self.labels.clear()
-        self.scrollframe.update_idletasks()
+        
+        while self.grid_layout.count():
+            self.grid_layout.takeAt(0).widget().deleteLater()

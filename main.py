@@ -1,22 +1,22 @@
 #!/usr/bin/env python3
 
-import tkinter as tk
 import sys
 import os
-from tkinterdnd2 import TkinterDnD
+from PyQt6.QtWidgets import QApplication
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from core.app import ImageAnalyzerApp
 
 def main():
-    root = TkinterDnD.Tk()
-    app = ImageAnalyzerApp(root)
+    app = QApplication(sys.argv)
+    window = ImageAnalyzerApp()
     
     if len(sys.argv) > 1:
-        app.load_image(sys.argv[1])
+        window.load_image(sys.argv[1])
     
-    root.mainloop()
+    window.show()
+    sys.exit(app.exec())
 
 if __name__ == "__main__":
     main()
