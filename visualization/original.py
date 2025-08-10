@@ -24,3 +24,8 @@ class OriginalImageModule(VisualizationModule):
     
     def get_module_name(self):
         return "Original Image"
+    
+    @classmethod
+    def get_supported_containers(cls):
+        from data_containers.image_container import ImageContainer
+        return [ImageContainer]

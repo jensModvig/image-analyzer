@@ -55,3 +55,8 @@ class GoldenRatioHSVModule(VisualizationModule):
     
     def get_module_name(self):
         return "Golden Ratio HSV"
+    
+    @classmethod
+    def get_supported_containers(cls):
+        from data_containers.image_container import ImageContainer
+        return [ImageContainer]

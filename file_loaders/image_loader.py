@@ -11,3 +11,8 @@ class ImageLoader(FileLoader):
     @property
     def extensions(self):
         return ['.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif']
+    
+    @property
+    def container_type(self):
+        from data_containers.image_container import ImageContainer
+        return ImageContainer

@@ -4,6 +4,7 @@ import cv2
 import numpy as np
 from PIL import Image, ImageTk
 import math
+import pyvista as pv
 
 class GridDisplay:
     def __init__(self, parent):
@@ -24,6 +25,8 @@ class GridDisplay:
         
         self.images = []
         self.labels = []
+        self.plotters = []
+        self.vtk_widgets = []
     
     def update_grid(self, visualizations):
         self._clear_grid()
@@ -31,18 +34,13 @@ class GridDisplay:
         if not visualizations:
             return
         
-        num_images = len(visualizations)
-        cols = math.ceil(math.sqrt(num_images))
-        rows = math.ceil(num_images / cols)
+        num_items = len(visualizations)
+        cols = math.ceil(math.sqrt(num_items))
+        rows = math.ceil(num_items / cols)
         
-        max_size = 300
-        
-        for i, (title, image) in enumerate(visualizations):
+        for i, (title, content) in enumerate(visualizations):
             row = i // cols
             col = i % cols
-            
-            display_image = self._prepare_image_for_display(image, max_size)
-            photo = ImageTk.PhotoImage(display_image)
             
             frame = ttk.Frame(self.scrollframe)
             frame.grid(row=row, column=col, padx=5, pady=5, sticky='nsew')
@@ -50,11 +48,31 @@ class GridDisplay:
             title_label = ttk.Label(frame, text=title, font=('Arial', 10, 'bold'))
             title_label.pack()
             
-            image_label = ttk.Label(frame, image=photo)
-            image_label.pack()
-            
-            self.images.append(photo)
-            self.labels.append((frame, title_label, image_label))
+            if isinstance(content, pv.Plotter):
+                try:
+                    from vtk.tk.vtkTkRenderWindowInteractor import vtkTkRenderWindowInteractor
+                    
+                    vtk_widget = vtkTkRenderWindowInteractor(frame, rw=content.ren_win, width=300, height=300)
+                    vtk_widget.Initialize()
+                    vtk_widget.pack(fill='both', expand=True)
+                    vtk_widget.Start()
+                    
+                    content.render()
+                    
+                    self.plotters.append(content)
+                    self.vtk_widgets.append(vtk_widget)
+                    self.labels.append((frame, title_label, vtk_widget))
+                except ImportError:
+                    error_label = ttk.Label(frame, text="VTK Tkinter support not available")
+                    error_label.pack()
+                    self.labels.append((frame, title_label, error_label))
+            else:
+                display_image = self._prepare_image_for_display(content, 300)
+                photo = ImageTk.PhotoImage(display_image)
+                image_label = ttk.Label(frame, image=photo)
+                image_label.pack()
+                self.images.append(photo)
+                self.labels.append((frame, title_label, image_label))
         
         self.scrollframe.update_idletasks()
         self.canvas.configure(scrollregion=self.canvas.bbox('all'))
@@ -77,6 +95,10 @@ class GridDisplay:
     
     def _clear_grid(self):
         self.images.clear()
+        for plotter in self.plotters:
+            plotter.close()
+        self.plotters.clear()
+        self.vtk_widgets.clear()
         for frame, _, _ in self.labels:
             frame.destroy()
         self.labels.clear()

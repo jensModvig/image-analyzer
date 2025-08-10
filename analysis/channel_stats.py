@@ -22,3 +22,8 @@ class ChannelStatsModule(AnalysisModule):
     
     def get_module_name(self):
         return "Channel Statistics"
+    
+    @classmethod
+    def get_supported_containers(cls):
+        from data_containers.image_container import ImageContainer
+        return [ImageContainer]

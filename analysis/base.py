@@ -11,3 +11,8 @@ class AnalysisModule(ABC):
     @abstractmethod
     def get_module_name(self):
         pass
+    
+    @classmethod
+    @abstractmethod
+    def get_supported_containers(cls):
+        pass

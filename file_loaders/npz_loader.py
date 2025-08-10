@@ -31,6 +31,11 @@ class NPZLoader(FileLoader):
     def extensions(self):
         return ['.npz']
     
+    @property
+    def container_type(self):
+        from data_containers.image_container import ImageContainer
+        return ImageContainer
+    
     def _show_array_selector(self, data):
         main_window = tk._default_root
         

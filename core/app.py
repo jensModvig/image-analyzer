@@ -2,7 +2,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 import os
 from tkinterdnd2 import DND_FILES
-from core.image_container import ImageContainer
+from data_containers.container_factory import create_container
 from core.module_manager import ModuleManager
 from core.file_watcher import FileWatcher
 from gui.grid_display import GridDisplay
@@ -24,7 +24,7 @@ class ImageAnalyzerApp:
         self.root.lift()
         self.root.focus_force()
         
-        self.image_container = None
+        self.data_container = None
         self.module_manager = ModuleManager()
         self.file_watcher = FileWatcher(self.root, self._reload_current_file)
         
@@ -76,23 +76,23 @@ class ImageAnalyzerApp:
     
     def load_image(self, filepath):
         self.file_watcher.stop_watching()
-        self.image_container = ImageContainer(filepath)
+        self.data_container = create_container(filepath)
         self._analyze_image()
-        self.file_watcher.start_watching(self.image_container.filepath)
+        self.file_watcher.start_watching(self.data_container.filepath)
     
     def _analyze_image(self):
-        if not self.image_container:
+        if not self.data_container:
             return
         
-        visualizations = self.module_manager.get_visualizations(self.image_container)
+        visualizations = self.module_manager.get_visualizations(self.data_container)
         self.grid_display.update_grid(visualizations)
         
-        properties = self.module_manager.get_properties(self.image_container)
+        properties = self.module_manager.get_properties(self.data_container)
         self.analysis_table.update_properties(properties)
     
     def _reload_current_file(self):
-        if self.image_container:
-            self.image_container.reload()
+        if self.data_container:
+            self.data_container.reload()
             self._analyze_image()
     
     def _on_closing(self):

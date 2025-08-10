@@ -2,6 +2,7 @@ from pathlib import Path
 from file_loaders.base import FileLoader
 from file_loaders.image_loader import ImageLoader
 from file_loaders.npz_loader import NPZLoader
+from file_loaders.pcl_loader import PCLLoader
 
 def get_loader(filepath):
     ext = Path(filepath).suffix.lower()
