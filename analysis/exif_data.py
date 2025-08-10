@@ -8,7 +8,7 @@ class EXIFDataModule(AnalysisModule):
             from PIL import Image
             from PIL.ExifTags import TAGS
             
-            with Image.open(self.image_container.filepath) as img:
+            with Image.open(self.data_container.filepath) as img:
                 exif_data = img.getexif()
                 
                 if exif_data:
@@ -39,3 +39,8 @@ class EXIFDataModule(AnalysisModule):
     
     def get_module_name(self):
         return "EXIF Data"
+    
+    @classmethod
+    def get_supported_containers(cls):
+        from data_containers.image_container import ImageContainer
+        return [ImageContainer]

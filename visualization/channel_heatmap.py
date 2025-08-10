@@ -6,8 +6,8 @@ class PerChannelHeatmapModule(VisualizationModule):
     def generate_visualizations(self):
         results = []
         
-        for i, channel_name in enumerate(self.image_container.channel_names):
-            channel = self.image_container.get_channel(i)
+        for i, channel_name in enumerate(self.data_container.channel_names):
+            channel = self.data_container.get_channel(i)
             colormap = self._get_colormap_for_channel(channel_name)
             
             normalized = cv2.normalize(channel, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U)
@@ -47,3 +47,8 @@ class PerChannelHeatmapModule(VisualizationModule):
     
     def get_module_name(self):
         return "Channel Heatmaps"
+    
+    @classmethod
+    def get_supported_containers(cls):
+        from data_containers.image_container import ImageContainer
+        return [ImageContainer]

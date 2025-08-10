@@ -1,7 +1,28 @@
 import numpy as np
-import tkinter as tk
-from tkinter import ttk
+from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QListWidget, QPushButton, QLabel, QApplication
+from PyQt6.QtCore import Qt, QTimer
 from file_loaders.base import FileLoader
+
+class ValidOnlyListWidget(QListWidget):
+    def __init__(self, valid_indices):
+        super().__init__()
+        self.valid_indices = valid_indices
+    
+    def keyPressEvent(self, event):
+        if event.key() in (Qt.Key.Key_Up, Qt.Key.Key_Down):
+            current = self.currentRow()
+            direction = 1 if event.key() == Qt.Key.Key_Down else -1
+            
+            next_valid = None
+            for i in range(current + direction, len(self.valid_indices) if direction > 0 else -1, direction):
+                if i in self.valid_indices:
+                    next_valid = i
+                    break
+            
+            if next_valid is not None:
+                self.setCurrentRow(next_valid)
+        else:
+            super().keyPressEvent(event)
 
 class NPZLoader(FileLoader):
     def __init__(self):
@@ -9,20 +30,20 @@ class NPZLoader(FileLoader):
     
     def load(self, filepath):
         data = np.load(filepath)
-        self.selected_key = self._show_array_selector(data)
-        if self.selected_key is None:
+        self.selected_key = self._show_selector(data)
+        if not self.selected_key:
             raise ValueError("No array selected")
         return data[self.selected_key], {'selected_key': self.selected_key}
     
     def reload_with_stored_params(self, filepath):
-        if self.selected_key is None:
+        if not self.selected_key:
             return self.load(filepath)
         
         data = np.load(filepath)
         if self.selected_key not in data:
-            valid_keys = [k for k in data.keys() if self._is_valid_image_array(data[k])]
+            valid_keys = [k for k in data.keys() if self._is_valid(data[k])]
             if not valid_keys:
-                raise ValueError(f"No valid image arrays found in {filepath}")
+                raise ValueError(f"No valid arrays in {filepath}")
             self.selected_key = valid_keys[0]
         
         return data[self.selected_key], {'selected_key': self.selected_key}
@@ -31,101 +52,89 @@ class NPZLoader(FileLoader):
     def extensions(self):
         return ['.npz']
     
-    def _show_array_selector(self, data):
-        main_window = tk._default_root
+    @property
+    def container_type(self):
+        from data_containers.image_container import ImageContainer
+        return ImageContainer
+    
+    def _show_selector(self, data):
+        parent = QApplication.activeWindow()
         
-        root = tk.Toplevel(main_window)
-        root.title("Select Array")
-        root.geometry("400x300")
+        if parent:
+            parent.raise_()
+            parent.activateWindow()
         
-        main_x = main_window.winfo_x()
-        main_y = main_window.winfo_y()
-        main_width = main_window.winfo_width()
-        main_height = main_window.winfo_height()
+        dialog = QDialog(parent)
+        dialog.setWindowTitle("Select Array")
+        dialog.setModal(True)
+        dialog.resize(400, 300)
         
-        popup_width = 400
-        popup_height = 300
-        x = main_x + (main_width - popup_width) // 2
-        y = main_y + (main_height - popup_height) // 2
+        if parent:
+            dialog.move(parent.x() + (parent.width() - 400) // 2, parent.y() + (parent.height() - 300) // 2)
         
-        root.geometry(f"{popup_width}x{popup_height}+{x}+{y}")
-        root.transient(main_window)
-        root.grab_set()
-        root.focus_set()
+        layout = QVBoxLayout(dialog)
+        layout.addWidget(QLabel("Select array to load:"))
+        
+        valid_indices = []
+        keys = list(data.keys())
+        
+        for i, (key, array) in enumerate(data.items()):
+            if self._is_valid(array):
+                valid_indices.append(i)
+        
+        list_widget = ValidOnlyListWidget(valid_indices)
+        
+        for i, (key, array) in enumerate(data.items()):
+            dims = f"({array.shape[0]}×{array.shape[1]})" if len(array.shape) == 2 else f"{array.shape}"
+            item_text = f"{key} {dims}"
+            list_widget.addItem(item_text)
+            
+            if i not in valid_indices:
+                item = list_widget.item(i)
+                item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsSelectable & ~Qt.ItemFlag.ItemIsEnabled)
+        
+        if valid_indices:
+            list_widget.setCurrentRow(valid_indices[0])
+        
+        layout.addWidget(list_widget)
+        
+        buttons = QHBoxLayout()
+        cancel_btn = QPushButton("Cancel")
+        select_btn = QPushButton("Select")
+        select_btn.setDefault(True)
+        
+        buttons.addStretch()
+        buttons.addWidget(cancel_btn)
+        buttons.addWidget(select_btn)
+        layout.addLayout(buttons)
         
         selected_key = None
-        valid_keys = []
         
-        frame = ttk.Frame(root)
-        frame.pack(fill='both', expand=True, padx=10, pady=10)
-        
-        ttk.Label(frame, text="Select array to load:").pack(anchor='w')
-        
-        listbox = tk.Listbox(frame, height=10)
-        listbox.pack(fill='both', expand=True, pady=(5, 0))
-        
-        for key, array in data.items():
-            is_valid = self._is_valid_image_array(array)
-            dims_text = self._get_dimensions_text(array)
-            display_text = f"{key} {dims_text}"
-            
-            listbox.insert('end', display_text)
-            if is_valid:
-                valid_keys.append(key)
-            else:
-                listbox.itemconfig('end', fg='gray')
-        
-        if valid_keys:
-            first_valid_idx = list(data.keys()).index(valid_keys[0])
-            listbox.selection_set(first_valid_idx)
-            listbox.activate(first_valid_idx)
-        
-        def on_select():
+        def select():
             nonlocal selected_key
-            selection = listbox.curselection()
-            if selection:
-                key = list(data.keys())[selection[0]]
-                if key in valid_keys:
-                    selected_key = key
-                    root.destroy()
+            current_row = list_widget.currentRow()
+            if current_row >= 0 and current_row in valid_indices:
+                selected_key = keys[current_row]
+                dialog.accept()
         
-        def on_key(event):
-            if event.keysym == 'Return':
-                on_select()
-            elif event.keysym == 'Escape':
-                root.destroy()
+        select_btn.clicked.connect(select)
+        cancel_btn.clicked.connect(dialog.reject)
+        list_widget.itemDoubleClicked.connect(select)
         
-        listbox.bind('<Double-Button-1>', lambda e: on_select())
-        listbox.bind('<Return>', on_key)
-        root.bind('<Key>', on_key)
+        dialog.show()
+        dialog.raise_()
+        dialog.activateWindow()
         
-        button_frame = ttk.Frame(frame)
-        button_frame.pack(fill='x', pady=(5, 0))
+        QTimer.singleShot(50, lambda: (
+            dialog.raise_(),
+            dialog.activateWindow(),
+            list_widget.setFocus()
+        ))
         
-        ttk.Button(button_frame, text="Select", command=on_select).pack(side='right', padx=(5, 0))
-        ttk.Button(button_frame, text="Cancel", command=root.destroy).pack(side='right')
-        
-        listbox.focus_set()
-        root.wait_window()
-        
-        return selected_key
+        return selected_key if dialog.exec() == QDialog.DialogCode.Accepted else None
     
-    def _is_valid_image_array(self, array):
-        if not isinstance(array, np.ndarray):
-            return False
-        if not np.issubdtype(array.dtype, np.number):
-            return False
-        if len(array.shape) == 2:
-            return array.shape[0] > 1 and array.shape[1] > 1
-        elif len(array.shape) == 3:
-            h, w, c = array.shape
-            return h > 1 and w > 1 and c in {1, 3, 4}
-        return False
-    
-    def _get_dimensions_text(self, array):
-        if len(array.shape) == 2:
-            return f"({array.shape[0]}×{array.shape[1]})"
-        elif len(array.shape) == 3:
-            return f"({array.shape[0]}×{array.shape[1]}×{array.shape[2]})"
-        else:
-            return f"{array.shape}"
+    def _is_valid(self, array):
+        return (isinstance(array, np.ndarray) and 
+                np.issubdtype(array.dtype, np.number) and
+                ((len(array.shape) == 2 and all(s > 1 for s in array.shape)) or
+                 (len(array.shape) == 3 and array.shape[0] > 1 and array.shape[1] > 1 and array.shape[2] in {1, 3, 4})))

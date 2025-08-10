@@ -6,23 +6,23 @@ class GoldenRatioHSVModule(VisualizationModule):
     def generate_visualizations(self):
         results = []
         
-        if self.image_container.channels == 1:
-            unique_vals = np.unique(self.image_container.original)
+        if self.data_container.channels == 1:
+            unique_vals = np.unique(self.data_container.original)
             if len(unique_vals) <= 500:
-                results.append(("Golden Ratio HSV", self._map_channel(self.image_container.original, unique_vals)))
+                results.append(("Golden Ratio HSV", self._map_channel(self.data_container.original, unique_vals)))
         else:
-            max_channel_unique = max(len(np.unique(self.image_container.get_channel(i))) for i in range(self.image_container.channels))
+            max_channel_unique = max(len(np.unique(self.data_container.get_channel(i))) for i in range(self.data_container.channels))
             if max_channel_unique <= 100:
-                for i, name in enumerate(self.image_container.channel_names):
-                    channel = self.image_container.get_channel(i)
+                for i, name in enumerate(self.data_container.channel_names):
+                    channel = self.data_container.get_channel(i)
                     unique_vals = np.unique(channel)
                     results.append((f"{name} Golden Ratio HSV", self._map_channel(channel, unique_vals)))
             
-            reshaped = self.image_container.original.reshape(-1, self.image_container.channels)
+            reshaped = self.data_container.original.reshape(-1, self.data_container.channels)
             unique_colors, indices = np.unique(reshaped, axis=0, return_inverse=True)
             if len(unique_colors) <= 500:
                 colors = self._generate_colors(len(unique_colors))
-                mapped = colors[indices].reshape(*self.image_container.original.shape[:2], 3)
+                mapped = colors[indices].reshape(*self.data_container.original.shape[:2], 3)
                 results.append(("Global Golden Ratio HSV", mapped))
         
         return results
@@ -55,3 +55,8 @@ class GoldenRatioHSVModule(VisualizationModule):
     
     def get_module_name(self):
         return "Golden Ratio HSV"
+    
+    @classmethod
+    def get_supported_containers(cls):
+        from data_containers.image_container import ImageContainer
+        return [ImageContainer]

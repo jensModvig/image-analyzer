@@ -6,8 +6,8 @@ class ChannelStatsModule(AnalysisModule):
     def extract_properties(self):
         properties = []
         
-        for i, channel_name in enumerate(self.image_container.channel_names):
-            channel = self.image_container.get_channel(i)
+        for i, channel_name in enumerate(self.data_container.channel_names):
+            channel = self.data_container.get_channel(i)
             
             min_val, max_val, _, _ = cv2.minMaxLoc(channel)
             mean_val = np.mean(channel)
@@ -22,3 +22,8 @@ class ChannelStatsModule(AnalysisModule):
     
     def get_module_name(self):
         return "Channel Statistics"
+    
+    @classmethod
+    def get_supported_containers(cls):
+        from data_containers.image_container import ImageContainer
+        return [ImageContainer]

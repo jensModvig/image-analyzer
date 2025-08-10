@@ -7,12 +7,14 @@ A modular Python image analysis application with visual representations and deta
 - **Visual Representations**: Original image, golden ratio HSV mapping, per-channel heatmaps
 - **Detailed Analysis**: Resolution, channel statistics, EXIF data, color analysis
 - **Multi-format Support**: RGB, RGBA, Grayscale, and other formats
+- **Point Cloud Support**: RGB and black point cloud visualization
 - **Modular Architecture**: Easy to extend with new visualization and analysis modules
 
 ## Installation
 
 ```bash
-pip install -r requirements.txt
+conda env create -f environment.yml
+conda activate image-analyzer
 ```
 
 ## Usage
@@ -21,7 +23,11 @@ pip install -r requirements.txt
 python main.py [image_file]
 ```
 
-Or run without arguments to open a file dialog.
+## Update Environment
+
+```bash
+conda env update -f environment.yml --prune
+```
 
 ## File Structure
 
@@ -31,14 +37,18 @@ image_analyzer/
 ├── core/                   # Core application logic
 ├── visualization/          # Visual representation modules
 ├── analysis/              # Data analysis modules
-├── gui/                   # GUI components
+├── gui/                   # GUI components (PyQt6)
+├── data_containers/       # Data container classes
+├── file_loaders/          # File loading modules
 └── utils/                 # Utility functions
 ```
 
 ## Dependencies
 
-- OpenCV (cv2) - Primary image processing
+- OpenCV - Image processing
 - NumPy - Numerical operations
-- Pillow (PIL) - EXIF data extraction
-- scikit-learn - Color clustering (optional)
-- tkinter - GUI (built-in with Python)
+- Pillow - EXIF data extraction
+- scikit-learn - Color clustering
+- PyQt6 - GUI framework
+- VTK/PyVista - 3D visualization
+- Open3D - Point cloud processing

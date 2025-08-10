@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 
 class VisualizationModule(ABC):
     def __init__(self, image_container):
-        self.image_container = image_container
+        self.data_container = image_container
     
     @abstractmethod
     def generate_visualizations(self):
@@ -10,4 +10,9 @@ class VisualizationModule(ABC):
     
     @abstractmethod
     def get_module_name(self):
+        pass
+    
+    @classmethod
+    @abstractmethod
+    def get_supported_containers(cls):
         pass

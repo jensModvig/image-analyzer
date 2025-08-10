@@ -3,12 +3,12 @@ from analysis.base import AnalysisModule
 
 class NPZAnalysisModule(AnalysisModule):
     def extract_properties(self):
-        selected_key = self.image_container.loader_data.get('selected_key')
+        selected_key = self.data_container.loader_data.get('selected_key')
         if not selected_key:
             return []
         
         try:
-            data = np.load(self.image_container.filepath)
+            data = np.load(self.data_container.filepath)
             all_keys = list(data.keys())
             data.close()
         except:
@@ -21,3 +21,8 @@ class NPZAnalysisModule(AnalysisModule):
     
     def get_module_name(self):
         return "NPZ Data"
+    
+    @classmethod
+    def get_supported_containers(cls):
+        from data_containers.image_container import ImageContainer
+        return [ImageContainer]

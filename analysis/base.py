@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
 
 class AnalysisModule(ABC):
-    def __init__(self, image_container):
-        self.image_container = image_container
+    def __init__(self, data_container):
+        self.data_container = data_container
     
     @abstractmethod
     def extract_properties(self):
@@ -10,4 +10,9 @@ class AnalysisModule(ABC):
     
     @abstractmethod
     def get_module_name(self):
+        pass
+    
+    @classmethod
+    @abstractmethod
+    def get_supported_containers(cls):
         pass
