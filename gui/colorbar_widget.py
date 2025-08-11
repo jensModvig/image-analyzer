@@ -21,7 +21,7 @@ class ColorBarWidget(QLabel):
             ticks.insert(1, (mid, height//2))
         
         for value, y_pos in ticks:
-            text = f'{value:.3g}' if isinstance(value, float) else str(int(value))
+            text = f'{float(value):.3g}'
             cv2.putText(colorbar, text, (2, y_pos), cv2.FONT_HERSHEY_SIMPLEX, 0.25, (255, 255, 255), 1)
         
         q_image = QImage(colorbar.data, width, height, width * 3, QImage.Format.Format_RGB888)

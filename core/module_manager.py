@@ -10,6 +10,7 @@ from analysis.exif_data import EXIFDataModule
 from analysis.color_analysis import ColorAnalysisModule
 from analysis.npz_data import NPZAnalysisModule
 from analysis.pcl_props import PCLBasicPropertiesModule
+from analysis.pcl_channel_stats import PCLChannelStatsModule
 
 class ModuleManager:
     def __init__(self):
@@ -27,7 +28,8 @@ class ModuleManager:
             EXIFDataModule,
             ColorAnalysisModule,
             NPZAnalysisModule,
-            PCLBasicPropertiesModule
+            PCLBasicPropertiesModule,
+            PCLChannelStatsModule
         ]
     
     def get_visualizations(self, container):
