@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 from visualization.base import VisualizationModule
+from gui.widget_utils import create_image_widget
 
 class OriginalImageModule(VisualizationModule):
     def generate_visualizations(self):
@@ -20,7 +21,7 @@ class OriginalImageModule(VisualizationModule):
         elif self.data_container.channels > 4:
             image = cv2.cvtColor(image[:, :, :3], cv2.COLOR_BGR2RGB)
         
-        return [("Original", image)]
+        return [("Original", create_image_widget(image))]
     
     def get_module_name(self):
         return "Original Image"

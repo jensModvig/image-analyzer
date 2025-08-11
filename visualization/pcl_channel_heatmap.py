@@ -1,7 +1,10 @@
 import pyvista as pv
 import numpy as np
 import cv2
+from PyQt6.QtWidgets import QWidget, QHBoxLayout
 from visualization.base import VisualizationModule
+from gui.colorbar_widget import ColorBarWidget
+from gui.widget_utils import create_qtinteractor, get_colormap_name, get_opencv_colormap
 
 class PCLChannelHeatmapModule(VisualizationModule):
     def generate_visualizations(self):
@@ -12,43 +15,27 @@ class PCLChannelHeatmapModule(VisualizationModule):
         
         for i, channel_name in enumerate(self.data_container.channel_names):
             channel = self.data_container.get_color_channel(i)
-            colormap = self._get_colormap_for_channel(channel_name)
-            
-            normalized = cv2.normalize(channel, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U)
-            heatmap = cv2.applyColorMap(normalized.reshape(-1, 1), colormap)
-            heatmap_rgb = cv2.cvtColor(heatmap, cv2.COLOR_BGR2RGB).squeeze() / 255.0
+            colormap_name = get_colormap_name(channel_name)
+            colormap = get_opencv_colormap(colormap_name)
             
             cloud = pv.PolyData(self.data_container.points)
-            cloud['colors'] = (heatmap_rgb * 255).astype(np.uint8)
+            normalized = cv2.normalize(channel, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U)
+            colors = cv2.applyColorMap(normalized.reshape(-1, 1), colormap)
+            cloud['colors'] = cv2.cvtColor(colors, cv2.COLOR_BGR2RGB).squeeze()
             
-            plotter = pv.Plotter()
-            plotter.add_mesh(cloud, scalars='colors', rgb=True, point_size=2.0)
+            vtk_widget = create_qtinteractor(cloud, self.data_container)
+            colorbar = ColorBarWidget(colormap_name, float(np.min(channel)), float(np.max(channel)), width=30, height=480)
             
-            state = self.data_container.get_camera_state()
-            plotter.camera.position = state['position']
-            plotter.camera.focal_point = state['focal_point']
-            plotter.camera.up = state['up']
+            widget = QWidget()
+            layout = QHBoxLayout(widget)
+            layout.setContentsMargins(0, 0, 0, 0)
+            layout.setSpacing(5)
+            layout.addWidget(vtk_widget)
+            layout.addWidget(colorbar)
             
-            def update_camera():
-                self.data_container.set_camera_state({
-                    'position': np.array(plotter.camera.position),
-                    'focal_point': np.array(plotter.camera.focal_point),
-                    'up': np.array(plotter.camera.up)
-                })
-            
-            plotter.iren.add_observer('EndInteractionEvent', lambda obj, event: update_camera())
-            
-            results.append((f"{channel_name} Heatmap", plotter))
+            results.append((f"{channel_name} Heatmap", widget))
         
         return results
-    
-    def _get_colormap_for_channel(self, channel_name):
-        colormap_mapping = {
-            'R': cv2.COLORMAP_PLASMA,
-            'G': cv2.COLORMAP_VIRIDIS,
-            'B': cv2.COLORMAP_CIVIDIS
-        }
-        return colormap_mapping.get(channel_name, cv2.COLORMAP_JET)
     
     def get_module_name(self):
         return "PCL Channel Heatmaps"
