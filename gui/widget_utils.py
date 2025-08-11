@@ -20,14 +20,15 @@ def create_image_widget(cv2_image):
     widget.setAlignment(Qt.AlignmentFlag.AlignCenter)
     return widget
 
-def create_heatmap_widget(cv2_image, colormap_name, min_val, max_val):
+def create_heatmap_widget(cv2_image, colormap_name, min_val, max_val, dual_axis=False, unit_converter=None):
     widget = QWidget()
     layout = QHBoxLayout(widget)
     layout.setContentsMargins(0, 0, 0, 0)
     layout.setSpacing(5)
     
     image_widget = create_image_widget(cv2_image)
-    colorbar = ColorBarWidget(colormap_name, float(min_val), float(max_val), width=30, height=cv2_image.shape[0])
+    colorbar = ColorBarWidget(colormap_name, float(min_val), float(max_val), 
+                             width=40, height=cv2_image.shape[0], dual_axis=dual_axis, unit_converter=unit_converter)
     
     layout.addWidget(image_widget)
     layout.addWidget(colorbar)
