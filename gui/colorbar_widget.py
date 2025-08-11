@@ -52,7 +52,8 @@ class ColorBarWidget(QWidget):
                    'cividis': cv2.COLORMAP_CIVIDIS, 'jet': cv2.COLORMAP_JET}.get(self.colormap_name, cv2.COLORMAP_JET)
         colors = cv2.applyColorMap(np.linspace(0, 255, 256, dtype=np.uint8).reshape(256, 1), colormap).squeeze()
         for i, color in enumerate(colors):
-            gradient.setColorAt(i / 255, QColor(color[2], color[1], color[0]))
+            position = 1.0 - (i / 255.0)
+            gradient.setColorAt(position, QColor(color[2], color[1], color[0]))
         
         painter.fillRect(rect, QBrush(gradient))
         painter.setPen(QPen(QColor(0, 0, 0), 1))
