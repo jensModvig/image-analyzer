@@ -16,7 +16,17 @@ class PerChannelHeatmapModule(VisualizationModule):
             heatmap = cv2.applyColorMap(normalized, colormap)
             heatmap_rgb = cv2.cvtColor(heatmap, cv2.COLOR_BGR2RGB)
             
-            widget = create_heatmap_widget(heatmap_rgb, colormap_name, np.min(channel), np.max(channel))
+            dual_axis = channel.dtype == np.uint16
+            unit_converter = (lambda x: x / 1000.0) if dual_axis else None
+            
+            widget = create_heatmap_widget(
+                heatmap_rgb, 
+                colormap_name, 
+                np.min(channel), 
+                np.max(channel),
+                dual_axis=dual_axis,
+                unit_converter=unit_converter
+            )
             results.append((f"{channel_name} Heatmap", widget))
         
         return results

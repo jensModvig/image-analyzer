@@ -193,54 +193,13 @@ class NPZLoader(FileLoader):
                 array.shape in [(3, 3), (3, 4), (4, 4)])
     
     def _project_depth(self, data, selection):
+        from utils.depth_projection import project_depth_to_pointcloud
+        
         depth_array = data[selection['coord']]
-        h, w = depth_array.shape
+        focal_length = float(data[selection['focal']]) if selection['focal'] else None
+        intrinsic_matrix = data[selection['matrix']] if selection['matrix'] else None
         
-        if np.issubdtype(depth_array.dtype, np.integer):
-            if np.any(depth_array < 0):
-                raise ValueError("Negative depth values found in integer depth array")
-            depth_shift = 1000.0
-        else:
-            depth_shift = 1.0
-        
-        if selection['focal']:
-            f_mm = float(data[selection['focal']])
-        else:
-            f_mm = 50.0
-        
-        f_px = f_mm * np.sqrt(w**2 + h**2) / np.sqrt(36**2 + 24**2)
-        
-        if selection['matrix']:
-            matrix = data[selection['matrix']]
-            if matrix.shape == (3, 3):
-                intrinsic = np.eye(4)
-                intrinsic[:3, :3] = matrix
-            elif matrix.shape == (3, 4):
-                intrinsic = np.eye(4)
-                intrinsic[:3, :] = matrix
-            else:
-                intrinsic = matrix
-        else:
-            intrinsic = np.array([
-                [f_px, 0, w/2, 0],
-                [0, f_px, h/2, 0],
-                [0, 0, 1, 0],
-                [0, 0, 0, 1]
-            ])
-        
-        x, y = np.meshgrid(np.arange(w), np.arange(h))
-        mask = depth_array != 0
-        
-        uv_depth = np.stack([x, y, depth_array / depth_shift], axis=-1)
-        uv_depth = uv_depth[mask]
-        
-        fx, fy = intrinsic[0, 0], intrinsic[1, 1]
-        cx, cy = intrinsic[0, 2], intrinsic[1, 2]
-        bx, by = intrinsic[0, 3], intrinsic[1, 3]
-        
-        X = (uv_depth[:, 0] - cx) * uv_depth[:, 2] / fx + bx
-        Y = (uv_depth[:, 1] - cy) * uv_depth[:, 2] / fy + by
-        points = np.column_stack([X, Y, uv_depth[:, 2]])
+        points, mask = project_depth_to_pointcloud(depth_array, focal_length, intrinsic_matrix)
         
         pcd = o3d.geometry.PointCloud()
         pcd.points = o3d.utility.Vector3dVector(points)

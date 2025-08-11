@@ -24,7 +24,19 @@ class PCLChannelHeatmapModule(VisualizationModule):
             cloud['colors'] = cv2.cvtColor(colors, cv2.COLOR_BGR2RGB).squeeze()
             
             vtk_widget = create_qtinteractor(cloud, self.data_container)
-            colorbar = ColorBarWidget(colormap_name, float(np.min(channel)), float(np.max(channel)), width=40, height=480)
+            
+            dual_axis = channel.dtype == np.uint16
+            unit_converter = (lambda x: x / 1000.0) if dual_axis else None
+            
+            colorbar = ColorBarWidget(
+                colormap_name, 
+                float(np.min(channel)), 
+                float(np.max(channel)), 
+                width=40, 
+                height=480,
+                dual_axis=dual_axis,
+                unit_converter=unit_converter
+            )
             
             widget = QWidget()
             layout = QHBoxLayout(widget)

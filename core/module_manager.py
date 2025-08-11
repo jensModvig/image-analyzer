@@ -3,6 +3,7 @@ from visualization.golden_ratio_hsv import GoldenRatioHSVModule
 from visualization.channel_heatmap import PerChannelHeatmapModule
 from visualization.pcl_rgb import PCLRGBModule
 from visualization.pcl_channel_heatmap import PCLChannelHeatmapModule
+from visualization.depth_pointcloud import DepthPointCloudModule
 
 from analysis.basic_props import BasicPropertiesModule
 from analysis.channel_stats import ChannelStatsModule
@@ -18,6 +19,7 @@ class ModuleManager:
             OriginalImageModule,
             GoldenRatioHSVModule,
             PerChannelHeatmapModule,
+            DepthPointCloudModule,
             PCLRGBModule,
             PCLChannelHeatmapModule
         ]
