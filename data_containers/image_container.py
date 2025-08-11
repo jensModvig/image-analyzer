@@ -1,13 +1,13 @@
 import cv2
 import numpy as np
 from data_containers.base_container import BaseContainer
-from file_loaders import get_loader
 
 class ImageContainer(BaseContainer):
-    def __init__(self, filepath):
+    def __init__(self, filepath, data, loader_data, loader):
         super().__init__(filepath)
-        self.loader = get_loader(filepath)
-        self.original, self.loader_data = self.loader.load(filepath)
+        self.original = data
+        self.loader_data = loader_data
+        self.loader = loader
         
         self.channels = self._detect_channels()
         self.channel_names = self._get_channel_names()
@@ -15,7 +15,9 @@ class ImageContainer(BaseContainer):
         self.data_max = np.max(self.original)
     
     def reload(self):
-        self.original, self.loader_data = self.loader.reload_with_stored_params(str(self.filepath))
+        container = self.loader.reload_container(str(self.filepath))
+        self.original = container.original
+        self.loader_data = container.loader_data
         self.channels = self._detect_channels()
         self.channel_names = self._get_channel_names()
         self.data_min = np.min(self.original)

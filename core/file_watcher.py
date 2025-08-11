@@ -1,4 +1,4 @@
-from PyQt6.QtCore import QTimer
+from PyQt6.QtCore import QTimer, QMetaObject, Qt, QObject, pyqtSlot
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
@@ -9,13 +9,14 @@ class FileChangeHandler(FileSystemEventHandler):
     
     def on_modified(self, event):
         if not event.is_directory and event.src_path == self.filepath:
-            self.file_watcher._on_file_changed()
+            QMetaObject.invokeMethod(self.file_watcher, "_on_file_changed", Qt.ConnectionType.QueuedConnection)
 
-class FileWatcher:
+class FileWatcher(QObject):
     def __init__(self, callback):
+        super().__init__()
         self.callback = callback
         self.observer = None
-        self.timer = QTimer()
+        self.timer = QTimer(self)
         self.timer.setSingleShot(True)
         self.timer.timeout.connect(self.callback)
     
@@ -33,6 +34,7 @@ class FileWatcher:
             self.observer = None
         self.timer.stop()
     
+    @pyqtSlot()
     def _on_file_changed(self):
         self.timer.stop()
         self.timer.start(200)

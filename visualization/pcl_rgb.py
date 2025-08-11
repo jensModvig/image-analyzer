@@ -9,7 +9,8 @@ class PCLRGBModule(VisualizationModule):
         plotter = pv.Plotter()
         
         if self.data_container.has_colors:
-            colors = (self.data_container.colors * 255).astype(np.uint8)
+            colors = np.asarray(self.data_container.point_cloud.colors)
+            colors = (colors * 255).astype(np.uint8)
             cloud['colors'] = colors
             plotter.add_mesh(cloud, scalars='colors', rgb=True, point_size=2.0)
         else:

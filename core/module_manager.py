@@ -2,7 +2,7 @@ from visualization.original import OriginalImageModule
 from visualization.golden_ratio_hsv import GoldenRatioHSVModule
 from visualization.channel_heatmap import PerChannelHeatmapModule
 from visualization.pcl_rgb import PCLRGBModule
-from visualization.pcl_black import PCLBlackModule
+from visualization.pcl_channel_heatmap import PCLChannelHeatmapModule
 
 from analysis.basic_props import BasicPropertiesModule
 from analysis.channel_stats import ChannelStatsModule
@@ -18,7 +18,7 @@ class ModuleManager:
             GoldenRatioHSVModule,
             PerChannelHeatmapModule,
             PCLRGBModule,
-            PCLBlackModule
+            PCLChannelHeatmapModule
         ]
         
         self.analysis_modules = [

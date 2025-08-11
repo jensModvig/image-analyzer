@@ -1,11 +1,10 @@
 from PyQt6.QtWidgets import QMainWindow, QSplitter, QFileDialog
 from PyQt6.QtCore import Qt, QTimer
-from data_containers.container_factory import create_container
+from file_loaders import get_loader, get_all_extensions
 from core.module_manager import ModuleManager
 from core.file_watcher import FileWatcher
 from gui.grid_display import GridDisplay
 from gui.analysis_table import AnalysisTable
-from file_loaders import get_all_extensions
 
 class ImageAnalyzerApp(QMainWindow):
     def __init__(self):
@@ -55,7 +54,8 @@ class ImageAnalyzerApp(QMainWindow):
     
     def load_image(self, filepath):
         self.file_watcher.stop_watching()
-        self.data_container = create_container(filepath)
+        loader = get_loader(filepath)
+        self.data_container = loader.create_container(filepath)
         self._analyze_image()
         self.file_watcher.start_watching(self.data_container.filepath)
         

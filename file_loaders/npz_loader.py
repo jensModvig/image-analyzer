@@ -1,140 +1,266 @@
 import numpy as np
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QListWidget, QPushButton, QLabel, QApplication
+import open3d as o3d
+from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem, QPushButton, QLabel, QApplication, QRadioButton, QButtonGroup, QListWidget, QSplitter, QWidget
 from PyQt6.QtCore import Qt, QTimer
 from file_loaders.base import FileLoader
 
-class ValidOnlyListWidget(QListWidget):
-    def __init__(self, valid_indices):
-        super().__init__()
-        self.valid_indices = valid_indices
-    
-    def keyPressEvent(self, event):
-        if event.key() in (Qt.Key.Key_Up, Qt.Key.Key_Down):
-            current = self.currentRow()
-            direction = 1 if event.key() == Qt.Key.Key_Down else -1
-            
-            next_valid = None
-            for i in range(current + direction, len(self.valid_indices) if direction > 0 else -1, direction):
-                if i in self.valid_indices:
-                    next_valid = i
-                    break
-            
-            if next_valid is not None:
-                self.setCurrentRow(next_valid)
-        else:
-            super().keyPressEvent(event)
-
 class NPZLoader(FileLoader):
-    def __init__(self):
-        self.selected_key = None
-    
-    def load(self, filepath):
+    def create_container(self, filepath):
         data = np.load(filepath)
-        self.selected_key = self._show_selector(data)
-        if not self.selected_key:
-            raise ValueError("No array selected")
-        return data[self.selected_key], {'selected_key': self.selected_key}
-    
-    def reload_with_stored_params(self, filepath):
-        if not self.selected_key:
-            return self.load(filepath)
         
-        data = np.load(filepath)
-        if self.selected_key not in data:
-            valid_keys = [k for k in data.keys() if self._is_valid(data[k])]
-            if not valid_keys:
-                raise ValueError(f"No valid arrays in {filepath}")
-            self.selected_key = valid_keys[0]
+        if not self.stored_params:
+            selection = self._show_selector(data)
+            if not selection:
+                raise ValueError("No selection made")
+            self.stored_params = selection
+        else:
+            selection = self.stored_params
         
-        return data[self.selected_key], {'selected_key': self.selected_key}
+        if selection['mode'] == 'image':
+            from data_containers.image_container import ImageContainer
+            return ImageContainer(filepath, data[selection['key']], selection, self)
+        else:
+            from data_containers.pcl_container import PCLContainer
+            point_cloud, original_colors = self._project_depth(data, selection)
+            enhanced_selection = selection.copy()
+            if original_colors is not None:
+                enhanced_selection['original_colors'] = original_colors
+            return PCLContainer(filepath, point_cloud, enhanced_selection, self)
     
     @property
     def extensions(self):
         return ['.npz']
     
-    @property
-    def container_type(self):
-        from data_containers.image_container import ImageContainer
-        return ImageContainer
-    
     def _show_selector(self, data):
         parent = QApplication.activeWindow()
-        
         if parent:
             parent.raise_()
             parent.activateWindow()
         
         dialog = QDialog(parent)
-        dialog.setWindowTitle("Select Array")
+        dialog.setWindowTitle("Select Arrays")
         dialog.setModal(True)
-        dialog.resize(400, 300)
+        dialog.resize(800, 500)
         
         if parent:
-            dialog.move(parent.x() + (parent.width() - 400) // 2, parent.y() + (parent.height() - 300) // 2)
+            dialog.move(parent.x() + (parent.width() - 800) // 2, parent.y() + (parent.height() - 500) // 2)
         
         layout = QVBoxLayout(dialog)
-        layout.addWidget(QLabel("Select array to load:"))
+        layout.addWidget(QLabel("Select arrays:"))
         
-        valid_indices = []
+        splitter = QSplitter(Qt.Orientation.Horizontal)
+        
+        # Left side: Image selection
+        left_widget = QWidget()
+        left_layout = QVBoxLayout(left_widget)
+        
+        list_widget = QListWidget()
         keys = list(data.keys())
         
-        for i, (key, array) in enumerate(data.items()):
-            if self._is_valid(array):
-                valid_indices.append(i)
-        
-        list_widget = ValidOnlyListWidget(valid_indices)
-        
-        for i, (key, array) in enumerate(data.items()):
+        for key, array in data.items():
             dims = f"({array.shape[0]}×{array.shape[1]})" if len(array.shape) == 2 else f"{array.shape}"
             item_text = f"{key} {dims}"
             list_widget.addItem(item_text)
             
-            if i not in valid_indices:
-                item = list_widget.item(i)
+            if not self._is_valid_image(array):
+                item = list_widget.item(list_widget.count() - 1)
                 item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsSelectable & ~Qt.ItemFlag.ItemIsEnabled)
         
-        if valid_indices:
-            list_widget.setCurrentRow(valid_indices[0])
+        for i, key in enumerate(keys):
+            if self._is_valid_image(data[key]):
+                list_widget.setCurrentRow(i)
+                break
         
-        layout.addWidget(list_widget)
+        image_btn = QPushButton("Load as Image")
         
-        buttons = QHBoxLayout()
+        left_layout.addWidget(list_widget)
+        left_layout.addWidget(image_btn)
+        splitter.addWidget(left_widget)
+        
+        # Right side: Depth projection selection
+        right_widget = QWidget()
+        right_layout = QVBoxLayout(right_widget)
+        
+        table = QTableWidget(len(keys), 4)
+        table.setHorizontalHeaderLabels(["Coordinates", "Color", "Focal", "Matrix"])
+        
+        coord_group = QButtonGroup()
+        color_group = QButtonGroup()
+        focal_group = QButtonGroup()
+        matrix_group = QButtonGroup()
+        
+        for i, (key, array) in enumerate(data.items()):
+            table.setVerticalHeaderItem(i, QTableWidgetItem(f"{key} {array.shape}"))
+            
+            if self._is_valid_coord(array):
+                coord_radio = QRadioButton()
+                coord_group.addButton(coord_radio, i)
+                table.setCellWidget(i, 0, coord_radio)
+            
+            if self._is_valid_color(array):
+                color_radio = QRadioButton()
+                color_group.addButton(color_radio, i)
+                table.setCellWidget(i, 1, color_radio)
+            
+            if self._is_valid_focal(array):
+                focal_radio = QRadioButton()
+                focal_group.addButton(focal_radio, i)
+                table.setCellWidget(i, 2, focal_radio)
+            
+            if self._is_valid_matrix(array):
+                matrix_radio = QRadioButton()
+                matrix_group.addButton(matrix_radio, i)
+                table.setCellWidget(i, 3, matrix_radio)
+        
+        project_btn = QPushButton("Project Depth Map")
+        
+        right_layout.addWidget(table)
+        right_layout.addWidget(project_btn)
+        splitter.addWidget(right_widget)
+        
+        splitter.setSizes([300, 500])
+        layout.addWidget(splitter)
+        
         cancel_btn = QPushButton("Cancel")
-        select_btn = QPushButton("Select")
-        select_btn.setDefault(True)
+        cancel_layout = QHBoxLayout()
+        cancel_layout.addStretch()
+        cancel_layout.addWidget(cancel_btn)
+        layout.addLayout(cancel_layout)
         
-        buttons.addStretch()
-        buttons.addWidget(cancel_btn)
-        buttons.addWidget(select_btn)
-        layout.addLayout(buttons)
+        selection = None
         
-        selected_key = None
+        def project():
+            nonlocal selection
+            coord_id = coord_group.checkedId()
+            if coord_id < 0:
+                return
+            
+            selection = {
+                'mode': 'project',
+                'coord': keys[coord_id],
+                'color': keys[color_group.checkedId()] if color_group.checkedId() >= 0 else None,
+                'focal': keys[focal_group.checkedId()] if focal_group.checkedId() >= 0 else None,
+                'matrix': keys[matrix_group.checkedId()] if matrix_group.checkedId() >= 0 else None
+            }
+            dialog.accept()
         
-        def select():
-            nonlocal selected_key
+        def load_image():
+            nonlocal selection
             current_row = list_widget.currentRow()
-            if current_row >= 0 and current_row in valid_indices:
-                selected_key = keys[current_row]
-                dialog.accept()
+            if current_row < 0 or not self._is_valid_image(data[keys[current_row]]):
+                return
+            selection = {'mode': 'image', 'key': keys[current_row]}
+            dialog.accept()
         
-        select_btn.clicked.connect(select)
+        project_btn.clicked.connect(project)
+        image_btn.clicked.connect(load_image)
         cancel_btn.clicked.connect(dialog.reject)
-        list_widget.itemDoubleClicked.connect(select)
         
         dialog.show()
         dialog.raise_()
         dialog.activateWindow()
         
-        QTimer.singleShot(50, lambda: (
-            dialog.raise_(),
-            dialog.activateWindow(),
-            list_widget.setFocus()
-        ))
+        QTimer.singleShot(50, lambda: (dialog.raise_(), dialog.activateWindow()))
         
-        return selected_key if dialog.exec() == QDialog.DialogCode.Accepted else None
+        return selection if dialog.exec() == QDialog.DialogCode.Accepted else None
     
-    def _is_valid(self, array):
+    def _is_valid_image(self, array):
         return (isinstance(array, np.ndarray) and 
                 np.issubdtype(array.dtype, np.number) and
                 ((len(array.shape) == 2 and all(s > 1 for s in array.shape)) or
                  (len(array.shape) == 3 and array.shape[0] > 1 and array.shape[1] > 1 and array.shape[2] in {1, 3, 4})))
+    
+    def _is_valid_coord(self, array):
+        return (isinstance(array, np.ndarray) and 
+                np.issubdtype(array.dtype, np.number) and
+                len(array.shape) == 2 and all(s > 1 for s in array.shape))
+    
+    def _is_valid_color(self, array):
+        return (isinstance(array, np.ndarray) and 
+                np.issubdtype(array.dtype, np.number) and
+                ((len(array.shape) == 2 and all(s > 1 for s in array.shape)) or
+                 (len(array.shape) == 3 and array.shape[0] > 1 and array.shape[1] > 1 and array.shape[2] in {1, 3, 4})))
+    
+    def _is_valid_focal(self, array):
+        return (isinstance(array, np.ndarray) and 
+                np.issubdtype(array.dtype, np.number) and
+                (array.shape == () or (len(array.shape) == 1 and array.shape[0] == 1)))
+    
+    def _is_valid_matrix(self, array):
+        return (isinstance(array, np.ndarray) and 
+                np.issubdtype(array.dtype, np.number) and
+                len(array.shape) == 2 and
+                array.shape in [(3, 3), (3, 4), (4, 4)])
+    
+    def _project_depth(self, data, selection):
+        depth_array = data[selection['coord']]
+        h, w = depth_array.shape
+        
+        if np.issubdtype(depth_array.dtype, np.integer):
+            if np.any(depth_array < 0):
+                raise ValueError("Negative depth values found in integer depth array")
+            depth_shift = 1000.0
+        else:
+            depth_shift = 1.0
+        
+        if selection['focal']:
+            f_mm = float(data[selection['focal']])
+        else:
+            f_mm = 50.0
+        
+        f_px = f_mm * np.sqrt(w**2 + h**2) / np.sqrt(36**2 + 24**2)
+        
+        if selection['matrix']:
+            matrix = data[selection['matrix']]
+            if matrix.shape == (3, 3):
+                intrinsic = np.eye(4)
+                intrinsic[:3, :3] = matrix
+            elif matrix.shape == (3, 4):
+                intrinsic = np.eye(4)
+                intrinsic[:3, :] = matrix
+            else:
+                intrinsic = matrix
+        else:
+            intrinsic = np.array([
+                [f_px, 0, w/2, 0],
+                [0, f_px, h/2, 0],
+                [0, 0, 1, 0],
+                [0, 0, 0, 1]
+            ])
+        
+        x, y = np.meshgrid(np.arange(w), np.arange(h))
+        mask = depth_array != 0
+        
+        uv_depth = np.stack([x, y, depth_array / depth_shift], axis=-1)
+        uv_depth = uv_depth[mask]
+        
+        fx, fy = intrinsic[0, 0], intrinsic[1, 1]
+        cx, cy = intrinsic[0, 2], intrinsic[1, 2]
+        bx, by = intrinsic[0, 3], intrinsic[1, 3]
+        
+        X = (uv_depth[:, 0] - cx) * uv_depth[:, 2] / fx + bx
+        Y = (uv_depth[:, 1] - cy) * uv_depth[:, 2] / fy + by
+        points = np.column_stack([X, Y, uv_depth[:, 2]])
+        
+        pcd = o3d.geometry.PointCloud()
+        pcd.points = o3d.utility.Vector3dVector(points)
+        
+        original_colors = None
+        if selection['color']:
+            color_array = data[selection['color']]
+            if len(color_array.shape) == 2:
+                original_colors = color_array[mask]
+                colors = np.column_stack([original_colors, original_colors, original_colors]) / 255.0
+            else:
+                original_colors = color_array[mask]
+                if color_array.shape[2] == 1:
+                    colors = np.column_stack([original_colors[:, 0], original_colors[:, 0], original_colors[:, 0]]) / 255.0
+                elif color_array.shape[2] == 3:
+                    original_colors = original_colors[:, [2, 1, 0]]
+                    colors = original_colors / 255.0
+                elif color_array.shape[2] == 4:
+                    original_colors = original_colors[:, [2, 1, 0, 3]]
+                    colors = original_colors[:, :3] / 255.0
+            pcd.colors = o3d.utility.Vector3dVector(colors)
+        
+        return pcd, original_colors
