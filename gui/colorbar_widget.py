@@ -62,7 +62,10 @@ class ColorBarWidget(QWidget):
         painter.setFont(QFont("", 8))
         metrics = QFontMetrics(QFont("", 8))
         for tick in self.ticks:
-            y = int(rect.bottom() - (tick - self.vmin) / (self.vmax - self.vmin) * rect.height())
+            if self.vmax == self.vmin:
+                y = int(rect.top() + rect.height() / 2)
+            else:
+                y = int(rect.bottom() - (tick - self.vmin) / (self.vmax - self.vmin) * rect.height())
             painter.drawLine(int(rect.left() - 5), y, int(rect.left()), y)
             
             left_text = f"{tick:.2f}"
