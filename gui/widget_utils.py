@@ -49,19 +49,21 @@ def create_qtinteractor(cloud, container):
     else:
         vtk_widget.add_mesh(cloud, color='lightgray', point_size=2.0)
     
-    state = container.get_camera_state()
-    vtk_widget.camera.position = state['position']
-    vtk_widget.camera.focal_point = state['focal_point']
-    vtk_widget.camera.up = state['up']
+    if container:
+        state = container.get_camera_state()
+        vtk_widget.camera.position = state['position']
+        vtk_widget.camera.focal_point = state['focal_point']
+        vtk_widget.camera.up = state['up']
+        
+        def update_camera():
+            container.set_camera_state({
+                'position': np.array(vtk_widget.camera.position),
+                'focal_point': np.array(vtk_widget.camera.focal_point),
+                'up': np.array(vtk_widget.camera.up)
+            })
+        
+        vtk_widget.iren.add_observer('EndInteractionEvent', lambda obj, event: update_camera())
     
-    def update_camera():
-        container.set_camera_state({
-            'position': np.array(vtk_widget.camera.position),
-            'focal_point': np.array(vtk_widget.camera.focal_point),
-            'up': np.array(vtk_widget.camera.up)
-        })
-    
-    vtk_widget.iren.add_observer('EndInteractionEvent', lambda obj, event: update_camera())
     return vtk_widget
 
 def get_colormap_name(channel_name):
