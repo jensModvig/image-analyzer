@@ -9,6 +9,7 @@ dependencies:
   - scikit-learn
   - watchdog
   - pyqt>=6.0
+  - paramiko
   - pip
   - pip:
     - open3d

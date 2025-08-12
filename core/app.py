@@ -4,8 +4,13 @@ from file_loaders import get_loader, get_all_extensions
 from file_loaders.npz_loader import NPZLoader
 from core.module_manager import ModuleManager
 from core.file_watcher import FileWatcher
+from core.file_access import FileAccessManager
+from core.ssh_manager import SSHConnectionPool
+from core.remote_monitor import RemoteFileMonitor
+from core.settings import Settings
 from gui.grid_display import GridDisplay
 from gui.analysis_table import AnalysisTable
+from gui.remote_dialog import RemoteImageDialog
 
 class ImageAnalyzerApp(QMainWindow):
     def __init__(self):
@@ -19,6 +24,7 @@ class ImageAnalyzerApp(QMainWindow):
         self.data_container = None
         self.module_manager = ModuleManager()
         self.file_watcher = FileWatcher(self._reload_current_file)
+        self.settings = Settings()
         
         self.splitter = QSplitter(Qt.Orientation.Vertical)
         self.setCentralWidget(self.splitter)
@@ -32,6 +38,7 @@ class ImageAnalyzerApp(QMainWindow):
         
         file_menu = self.menuBar().addMenu("File")
         file_menu.addAction("Open Image", self._open_image)
+        file_menu.addAction("Open Remote Image", self._open_remote_image)
         file_menu.addSeparator()
         file_menu.addAction("Exit", self.close)
         
@@ -55,9 +62,27 @@ class ImageAnalyzerApp(QMainWindow):
         if filename:
             self.load_image(filename)
     
+    def _open_remote_image(self):
+        dialog = RemoteImageDialog()
+        if dialog.exec() == RemoteImageDialog.DialogCode.Accepted:
+            connection_info = dialog.get_connection_info()
+            remote_path = dialog.get_remote_path()
+            if not remote_path:
+                return
+            
+            config_host = connection_info.get('config_host')
+            if config_host:
+                remote_identifier = f"{config_host}:{remote_path}"
+            else:
+                remote_identifier = f"{connection_info['hostname']}:{remote_path}"
+            
+            self.load_image((remote_identifier, connection_info))
+    
     def load_image(self, filepath):
-        loader = get_loader(filepath)
-        container = loader.create_container(filepath)
+        resolved_path = FileAccessManager.resolve_path(filepath)
+        
+        loader = get_loader(resolved_path)
+        container = loader.create_container(resolved_path)
         if container is None:
             return
         
@@ -84,4 +109,6 @@ class ImageAnalyzerApp(QMainWindow):
     
     def closeEvent(self, event):
         self.file_watcher.stop_watching()
+        SSHConnectionPool.cleanup()
+        RemoteFileMonitor.cleanup()
         event.accept()
