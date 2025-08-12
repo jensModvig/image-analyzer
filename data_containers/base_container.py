@@ -8,7 +8,3 @@ class BaseContainer(ABC):
     @abstractmethod
     def reload(self):
         pass
-    
-    @abstractmethod
-    def get_basic_properties(self):
-        pass

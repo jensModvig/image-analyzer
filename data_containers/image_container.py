@@ -22,17 +22,6 @@ class ImageContainer(BaseContainer):
         self.channel_names = self._get_channel_names()
         self.data_min = np.min(self.original)
         self.data_max = np.max(self.original)
-    
-    def get_basic_properties(self):
-        return [
-            ("Image Name", self.filepath.name, False),
-            ("Full Path", self.filepath, False),
-            ("Width", self.original.shape[1], False),
-            ("Height", self.original.shape[0], False),
-            ("Channels", self.channels, False),
-            ("Data Type", str(self.original.dtype), False),
-            ("File Size", f"{self.filepath.stat().st_size} bytes", False)
-        ]
         
     def _detect_channels(self):
         if len(self.original.shape) == 2:

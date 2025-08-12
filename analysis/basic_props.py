@@ -1,3 +1,4 @@
+import numpy as np
 from analysis.base import AnalysisModule
 
 class BasicPropertiesModule(AnalysisModule):
@@ -11,6 +12,10 @@ class BasicPropertiesModule(AnalysisModule):
             ("Height", image.shape[0], False),
             ("Channels", self.data_container.channels, False),
             ("Data Type", str(image.dtype), False),
+            ("Min Value", self.data_container.data_min, False),
+            ("Max Value", self.data_container.data_max, False),
+            ("Has NaN", np.isnan(image).any(), False),
+            ("Has Inf", np.isinf(image).any(), False),
             ("File Size", f"{self.data_container.filepath.stat().st_size} bytes", False)
         ]
         

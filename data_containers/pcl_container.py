@@ -26,6 +26,10 @@ class PCLContainer(BaseContainer):
                 self.channel_names = []
         
         self.has_colors = len(self.original_colors) > 0
+        if self.has_colors:
+            self.colors_min = np.min(self.original_colors)
+            self.colors_max = np.max(self.original_colors)
+        
         self.bounds = self._calculate_bounds()
         self.current_camera_state = self._default_camera_state()
     
@@ -51,17 +55,11 @@ class PCLContainer(BaseContainer):
                 self.channel_names = []
         
         self.has_colors = len(self.original_colors) > 0
+        if self.has_colors:
+            self.colors_min = np.min(self.original_colors)
+            self.colors_max = np.max(self.original_colors)
+            
         self.bounds = self._calculate_bounds()
-    
-    def get_basic_properties(self):
-        return [
-            ("Point Cloud Name", self.filepath.name, False),
-            ("Full Path", self.filepath, False),
-            ("Point Count", len(self.points), False),
-            ("Has Colors", self.has_colors, False),
-            ("Bounds", f"{self.bounds[0]} to {self.bounds[1]}", False),
-            ("File Size", f"{self.filepath.stat().st_size} bytes", False)
-        ]
     
     def get_camera_state(self):
         return self.current_camera_state.copy()
