@@ -1,6 +1,6 @@
 import numpy as np
 import open3d as o3d
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem, QPushButton, QLabel, QApplication, QRadioButton, QButtonGroup, QListWidget, QSplitter, QWidget
+from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem, QPushButton, QLabel, QApplication, QRadioButton, QButtonGroup, QSplitter, QWidget, QSpinBox
 from PyQt6.QtCore import Qt, QTimer
 from file_loaders.base import FileLoader
 
@@ -16,17 +16,20 @@ class NPZLoader(FileLoader):
     def create_container(self, filepath):
         data = np.load(filepath)
         
-        if not self.stored_params:
+        selection = self.stored_params
+        if not selection:
             selection = self._show_selector(data)
             if not selection:
                 return None
             self.stored_params = selection
-        else:
-            selection = self.stored_params
         
         if selection['mode'] == 'image':
+            array = data[selection['key']]
+            if 'index' in selection:
+                slices = tuple(selection['index'] if j == selection['axis'] else slice(None) for j in range(array.ndim))
+                array = array[slices]
             from data_containers.image_container import ImageContainer
-            return ImageContainer(filepath, data[selection['key']], selection, self)
+            return ImageContainer(filepath, array, selection, self)
         else:
             from data_containers.pcl_container import PCLContainer
             point_cloud, original_colors = self._project_depth(data, selection)
@@ -38,6 +41,18 @@ class NPZLoader(FileLoader):
     @property
     def extensions(self):
         return ['.npz']
+    
+    def _is_indexable_image(self, array):
+        if array.ndim not in [3, 4]:
+            return False, -1, 0
+        
+        smallest_axis = np.argmin(array.shape)
+        remaining_shape = [array.shape[i] for i in range(array.ndim) if i != smallest_axis]
+        
+        temp_array = np.zeros(remaining_shape)
+        if self._is_valid_image(temp_array):
+            return True, smallest_axis, array.shape[smallest_axis]
+        return False, -1, 0
     
     def _show_selector(self, data):
         parent = QApplication.activeWindow()
@@ -59,30 +74,45 @@ class NPZLoader(FileLoader):
         
         splitter = QSplitter(Qt.Orientation.Horizontal)
         
-        # Left side: Image selection
+        # Left side: Image selection with indexing
         left_widget = QWidget()
         left_layout = QVBoxLayout(left_widget)
         
-        list_widget = QListWidget()
+        table_widget = QTableWidget(len(data), 3)
+        table_widget.setHorizontalHeaderLabels(["Key", "Shape", "Index"])
+        table_widget.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        
         keys = list(data.keys())
+        first_valid_row = -1
         
-        for key, array in data.items():
-            dims = f"({array.shape[0]}×{array.shape[1]})" if len(array.shape) == 2 else f"{array.shape}"
-            item_text = f"{key} {dims}"
-            list_widget.addItem(item_text)
+        for i, (key, array) in enumerate(data.items()):
+            table_widget.setItem(i, 0, QTableWidgetItem(key))
+            table_widget.setItem(i, 1, QTableWidgetItem(str(array.shape)))
             
-            if not self._is_valid_image(array):
-                item = list_widget.item(list_widget.count() - 1)
-                item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsSelectable & ~Qt.ItemFlag.ItemIsEnabled)
+            if self._is_valid_image(array):
+                if first_valid_row == -1:
+                    first_valid_row = i
+            else:
+                is_indexable, axis, max_index = self._is_indexable_image(array)
+                if is_indexable:
+                    spinbox = QSpinBox()
+                    spinbox.setRange(0, max_index - 1)
+                    spinbox.setValue(0)
+                    table_widget.setCellWidget(i, 2, spinbox)
+                    if first_valid_row == -1:
+                        first_valid_row = i
+                else:
+                    for col in range(3):
+                        item = table_widget.item(i, col)
+                        if item:
+                            item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsSelectable & ~Qt.ItemFlag.ItemIsEnabled)
         
-        for i, key in enumerate(keys):
-            if self._is_valid_image(data[key]):
-                list_widget.setCurrentRow(i)
-                break
+        if first_valid_row >= 0:
+            table_widget.selectRow(first_valid_row)
         
         image_btn = QPushButton("Load as Image")
         
-        left_layout.addWidget(list_widget)
+        left_layout.addWidget(table_widget)
         left_layout.addWidget(image_btn)
         splitter.addWidget(left_widget)
         
@@ -90,8 +120,8 @@ class NPZLoader(FileLoader):
         right_widget = QWidget()
         right_layout = QVBoxLayout(right_widget)
         
-        table = QTableWidget(len(keys), 4)
-        table.setHorizontalHeaderLabels(["Coordinates", "Color", "Focal", "Matrix"])
+        coord_table = QTableWidget(len(keys), 4)
+        coord_table.setHorizontalHeaderLabels(["Coordinates", "Color", "Focal", "Matrix"])
         
         coord_group = QButtonGroup()
         color_group = QButtonGroup()
@@ -99,31 +129,31 @@ class NPZLoader(FileLoader):
         matrix_group = QButtonGroup()
         
         for i, (key, array) in enumerate(data.items()):
-            table.setVerticalHeaderItem(i, QTableWidgetItem(f"{key} {array.shape}"))
+            coord_table.setVerticalHeaderItem(i, QTableWidgetItem(f"{key} {array.shape}"))
             
             if self._is_valid_coord(array):
                 coord_radio = QRadioButton()
                 coord_group.addButton(coord_radio, i)
-                table.setCellWidget(i, 0, coord_radio)
+                coord_table.setCellWidget(i, 0, coord_radio)
             
             if self._is_valid_color(array):
                 color_radio = QRadioButton()
                 color_group.addButton(color_radio, i)
-                table.setCellWidget(i, 1, color_radio)
+                coord_table.setCellWidget(i, 1, color_radio)
             
             if self._is_valid_focal(array):
                 focal_radio = QRadioButton()
                 focal_group.addButton(focal_radio, i)
-                table.setCellWidget(i, 2, focal_radio)
+                coord_table.setCellWidget(i, 2, focal_radio)
             
             if self._is_valid_matrix(array):
                 matrix_radio = QRadioButton()
                 matrix_group.addButton(matrix_radio, i)
-                table.setCellWidget(i, 3, matrix_radio)
+                coord_table.setCellWidget(i, 3, matrix_radio)
         
         project_btn = QPushButton("Project Depth Map")
         
-        right_layout.addWidget(table)
+        right_layout.addWidget(coord_table)
         right_layout.addWidget(project_btn)
         splitter.addWidget(right_widget)
         
@@ -155,10 +185,22 @@ class NPZLoader(FileLoader):
         
         def load_image():
             nonlocal selection
-            current_row = list_widget.currentRow()
-            if current_row < 0 or not self._is_valid_image(data[keys[current_row]]):
+            current_row = table_widget.currentRow()
+            if current_row < 0:
                 return
-            selection = {'mode': 'image', 'key': keys[current_row]}
+            
+            key = keys[current_row]
+            array = data[key]
+            
+            if self._is_valid_image(array):
+                selection = {'mode': 'image', 'key': key}
+            else:
+                is_indexable, axis, max_index = self._is_indexable_image(array)
+                if is_indexable:
+                    spinbox = table_widget.cellWidget(current_row, 2)
+                    selection = {'mode': 'image', 'key': key, 'index': spinbox.value(), 'axis': axis}
+                else:
+                    return
             dialog.accept()
         
         project_btn.clicked.connect(project)
