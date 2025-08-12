@@ -1,6 +1,7 @@
 from PyQt6.QtWidgets import QMainWindow, QSplitter, QFileDialog
 from PyQt6.QtCore import Qt, QTimer
 from file_loaders import get_loader, get_all_extensions
+from file_loaders.npz_loader import NPZLoader
 from core.module_manager import ModuleManager
 from core.file_watcher import FileWatcher
 from gui.grid_display import GridDisplay
@@ -43,9 +44,11 @@ class ImageAnalyzerApp(QMainWindow):
     def dropEvent(self, event):
         files = [url.toLocalFile() for url in event.mimeData().urls()]
         if files:
+            NPZLoader._close_existing_dialog()
             QTimer.singleShot(100, lambda: self.load_image(files[0]))
     
     def _open_image(self):
+        NPZLoader._close_existing_dialog()
         extensions = get_all_extensions()
         ext_pattern = " ".join(f"*{ext}" for ext in extensions)
         filename, _ = QFileDialog.getOpenFileName(self, "Select Image", "", f"All supported files ({ext_pattern})")
@@ -53,9 +56,13 @@ class ImageAnalyzerApp(QMainWindow):
             self.load_image(filename)
     
     def load_image(self, filepath):
-        self.file_watcher.stop_watching()
         loader = get_loader(filepath)
-        self.data_container = loader.create_container(filepath)
+        container = loader.create_container(filepath)
+        if container is None:
+            return
+        
+        self.file_watcher.stop_watching()
+        self.data_container = container
         self._analyze_image()
         self.file_watcher.start_watching(self.data_container.filepath)
         

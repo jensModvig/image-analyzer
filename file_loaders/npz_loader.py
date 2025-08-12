@@ -5,13 +5,21 @@ from PyQt6.QtCore import Qt, QTimer
 from file_loaders.base import FileLoader
 
 class NPZLoader(FileLoader):
+    _current_dialog = None
+    
+    @classmethod
+    def _close_existing_dialog(cls):
+        if cls._current_dialog:
+            cls._current_dialog.close()
+            cls._current_dialog = None
+    
     def create_container(self, filepath):
         data = np.load(filepath)
         
         if not self.stored_params:
             selection = self._show_selector(data)
             if not selection:
-                raise ValueError("No selection made")
+                return None
             self.stored_params = selection
         else:
             selection = self.stored_params
@@ -38,6 +46,7 @@ class NPZLoader(FileLoader):
             parent.activateWindow()
         
         dialog = QDialog(parent)
+        NPZLoader._current_dialog = dialog
         dialog.setWindowTitle("Select Arrays")
         dialog.setModal(True)
         dialog.resize(800, 500)
@@ -155,6 +164,7 @@ class NPZLoader(FileLoader):
         project_btn.clicked.connect(project)
         image_btn.clicked.connect(load_image)
         cancel_btn.clicked.connect(dialog.reject)
+        dialog.finished.connect(lambda: setattr(NPZLoader, '_current_dialog', None))
         
         dialog.show()
         dialog.raise_()
