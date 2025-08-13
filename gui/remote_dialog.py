@@ -2,9 +2,12 @@ import os
 import socket
 import threading
 import paramiko
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QComboBox, QLineEdit, QPushButton, QLabel, QFileDialog
+import stat
+from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QComboBox, QLineEdit, QPushButton, QLabel, QFileDialog, QMessageBox
 from PyQt6.QtCore import QTimer, pyqtSignal
 from core.settings import Settings
+from core.ssh_manager import SSHConnectionPool
+from gui.remote_directory_browser import RemoteDirectoryBrowser
 
 class RemoteImageDialog(QDialog):
     status_updated = pyqtSignal(str)
@@ -27,7 +30,7 @@ class RemoteImageDialog(QDialog):
         self.hostname_field = self._create_field("Hostname:", layout, self._on_hostname_changed)
         self.username_field = self._create_field("Username:", layout, self._update_form)
         self.identity_file_field = self._create_file_field("Identity File:", layout)
-        self.remote_path_field = self._create_field("Remote Path:", layout)
+        self.remote_path_field = self._create_file_field("Remote Path:", layout, self._browse_remote_path)
         
         status_layout = QHBoxLayout()
         self.status_label = QLabel("Enter hostname to check status")
@@ -63,12 +66,12 @@ class RemoteImageDialog(QDialog):
         layout.addWidget(field)
         return field
     
-    def _create_file_field(self, label, layout):
+    def _create_file_field(self, label, layout, browse_callback=None):
         hlayout = QHBoxLayout()
         hlayout.addWidget(QLabel(label))
         field = QLineEdit()
         browse = QPushButton("Browse")
-        browse.clicked.connect(lambda: self._browse_file(field))
+        browse.clicked.connect(browse_callback or (lambda: self._browse_file(field)))
         hlayout.addWidget(field)
         hlayout.addWidget(browse)
         layout.addLayout(hlayout)
@@ -134,7 +137,6 @@ class RemoteImageDialog(QDialog):
             
             username = self.username_field.text().strip()
             if username:
-                from core.ssh_manager import SSHConnectionPool
                 key = f"{username}@{hostname}"
                 with SSHConnectionPool._lock:
                     if key in SSHConnectionPool._connections:
@@ -190,7 +192,56 @@ class RemoteImageDialog(QDialog):
         if filename:
             field.setText(filename)
     
+    def _browse_remote_path(self):
+        if not (self.hostname_field.text().strip() and self.username_field.text().strip()):
+            QMessageBox.warning(self, "Missing Info", "Please enter hostname and username first.")
+            return
+        
+        current_path = self.remote_path_field.text().strip()
+        
+        if not current_path:
+            browse_path = "/"
+        else:
+            try:
+                ssh_client = SSHConnectionPool.get_connection(self.get_connection_info())
+                sftp = ssh_client.open_sftp()
+                try:
+                    if stat.S_ISDIR(sftp.stat(current_path).st_mode):
+                        browse_path = current_path
+                    else:
+                        browse_path = "/".join(current_path.rstrip("/").split("/")[:-1]) or "/"
+                finally:
+                    sftp.close()
+            except:
+                browse_path = "/".join(current_path.rstrip("/").split("/")[:-1]) or "/"
+        
+        browser = RemoteDirectoryBrowser(self.get_connection_info(), browse_path)
+        if browser.exec() == QDialog.DialogCode.Accepted and browser.get_selected_file_path():
+            self.remote_path_field.setText(browser.get_selected_file_path())
+    
     def _save_and_accept(self):
+        remote_path = self.remote_path_field.text().strip()
+        if not remote_path:
+            QMessageBox.warning(self, "Missing Path", "Please enter or browse for a remote path.")
+            return
+        
+        try:
+            ssh_client = SSHConnectionPool.get_connection(self.get_connection_info())
+            sftp = ssh_client.open_sftp()
+            try:
+                if stat.S_ISDIR(sftp.stat(remote_path).st_mode):
+                    browser = RemoteDirectoryBrowser(self.get_connection_info(), remote_path)
+                    if browser.exec() == QDialog.DialogCode.Accepted and browser.get_selected_file_path():
+                        self.remote_path_field.setText(browser.get_selected_file_path())
+                        self._save_settings_and_accept()
+                    return
+                self._save_settings_and_accept()
+            finally:
+                sftp.close()
+        except Exception as e:
+            QMessageBox.warning(self, "Connection Error", f"Failed to check remote path: {e}")
+    
+    def _save_settings_and_accept(self):
         self.settings.set('remote_dialog', {
             'host': self.host_combo.currentText(),
             'hostname': self.hostname_field.text(),
