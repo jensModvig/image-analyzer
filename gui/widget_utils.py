@@ -2,10 +2,11 @@ from PyQt6.QtWidgets import QLabel, QWidget, QHBoxLayout
 from PyQt6.QtGui import QPixmap, QImage
 from PyQt6.QtCore import Qt
 from gui.colorbar_widget import ColorBarWidget
+from gui.save_icon_overlay import add_save_functionality
 import cv2
 import numpy as np
 
-def create_image_widget(cv2_image):
+def _create_label_from_cv2(cv2_image):
     height, width = cv2_image.shape[:2]
     
     if len(cv2_image.shape) == 3:
@@ -20,19 +21,22 @@ def create_image_widget(cv2_image):
     widget.setAlignment(Qt.AlignmentFlag.AlignCenter)
     return widget
 
+def create_image_widget(cv2_image):
+    return add_save_functionality(_create_label_from_cv2(cv2_image))
+
 def create_heatmap_widget(cv2_image, colormap_name, min_val, max_val, dual_axis=False, unit_converter=None):
     widget = QWidget()
     layout = QHBoxLayout(widget)
     layout.setContentsMargins(0, 0, 0, 0)
     layout.setSpacing(5)
     
-    image_widget = create_image_widget(cv2_image)
+    image_widget = _create_label_from_cv2(cv2_image)
     colorbar = ColorBarWidget(colormap_name, float(min_val), float(max_val), 
                              width=40, height=cv2_image.shape[0], dual_axis=dual_axis, unit_converter=unit_converter)
     
     layout.addWidget(image_widget)
     layout.addWidget(colorbar)
-    return widget
+    return add_save_functionality(widget)
 
 def create_qtinteractor(cloud, container):
     try:
@@ -64,7 +68,7 @@ def create_qtinteractor(cloud, container):
         
         vtk_widget.iren.add_observer('EndInteractionEvent', lambda obj, event: update_camera())
     
-    return vtk_widget
+    return add_save_functionality(vtk_widget)
 
 def get_colormap_name(channel_name):
     mapping = {'R': 'plasma', 'G': 'viridis', 'B': 'cividis'}
