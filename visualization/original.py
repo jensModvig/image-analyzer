@@ -21,7 +21,7 @@ class OriginalImageModule(VisualizationModule):
         elif self.data_container.channels > 4:
             image = cv2.cvtColor(image[:, :, :3], cv2.COLOR_BGR2RGB)
         
-        return [("Original", create_image_widget(image))]
+        return [("Original", create_image_widget(image, self.get_module_name()))]
     
     def get_module_name(self):
         return "Original Image"

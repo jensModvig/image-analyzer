@@ -1,7 +1,7 @@
-import cv2
 import numpy as np
 from visualization.base import VisualizationModule
-from gui.widget_utils import create_heatmap_widget, get_colormap_name, get_opencv_colormap
+from gui.heatmap_widgets import create_heatmap_widget
+from utils.heatmap_utils import get_colormap_name
 
 class PerChannelHeatmapModule(VisualizationModule):
     def generate_visualizations(self):
@@ -10,20 +10,16 @@ class PerChannelHeatmapModule(VisualizationModule):
         for i, channel_name in enumerate(self.data_container.channel_names):
             channel = self.data_container.get_channel(i)
             colormap_name = get_colormap_name(channel_name)
-            colormap = get_opencv_colormap(colormap_name)
-            
-            normalized = cv2.normalize(channel, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U)
-            heatmap = cv2.applyColorMap(normalized, colormap)
-            heatmap_rgb = cv2.cvtColor(heatmap, cv2.COLOR_BGR2RGB)
             
             dual_axis = channel.dtype == np.uint16
             unit_converter = (lambda x: x / 1000.0) if dual_axis else None
             
             widget = create_heatmap_widget(
-                heatmap_rgb, 
-                colormap_name, 
-                np.min(channel), 
-                np.max(channel),
+                colormap_name=colormap_name,
+                min_val=np.min(channel),
+                max_val=np.max(channel),
+                original_channel_data=channel,
+                module_name=self.get_module_name(),
                 dual_axis=dual_axis,
                 unit_converter=unit_converter
             )

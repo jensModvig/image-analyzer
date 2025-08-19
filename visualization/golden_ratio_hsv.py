@@ -11,7 +11,7 @@ class GoldenRatioHSVModule(VisualizationModule):
             unique_vals = np.unique(self.data_container.original)
             if len(unique_vals) <= 500:
                 image = self._map_channel(self.data_container.original, unique_vals)
-                results.append(("Golden Ratio HSV", create_image_widget(image)))
+                results.append(("Golden Ratio HSV", create_image_widget(image, self.get_module_name())))
         else:
             max_channel_unique = max(len(np.unique(self.data_container.get_channel(i))) for i in range(self.data_container.channels))
             if max_channel_unique <= 100:
@@ -19,14 +19,14 @@ class GoldenRatioHSVModule(VisualizationModule):
                     channel = self.data_container.get_channel(i)
                     unique_vals = np.unique(channel)
                     image = self._map_channel(channel, unique_vals)
-                    results.append((f"{name} Golden Ratio HSV", create_image_widget(image)))
+                    results.append((f"{name} Golden Ratio HSV", create_image_widget(image, self.get_module_name())))
             
             reshaped = self.data_container.original.reshape(-1, self.data_container.channels)
             unique_colors, indices = np.unique(reshaped, axis=0, return_inverse=True)
             if len(unique_colors) <= 500:
                 colors = self._generate_colors(len(unique_colors))
                 image = colors[indices].reshape(*self.data_container.original.shape[:2], 3)
-                results.append(("Global Golden Ratio HSV", create_image_widget(image)))
+                results.append(("Global Golden Ratio HSV", create_image_widget(image, self.get_module_name())))
         
         return results
     

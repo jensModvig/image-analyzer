@@ -1,10 +1,8 @@
 import pyvista as pv
 import numpy as np
-import cv2
-from PyQt6.QtWidgets import QWidget, QHBoxLayout
 from visualization.base import VisualizationModule
-from gui.colorbar_widget import ColorBarWidget
-from gui.widget_utils import create_qtinteractor, get_colormap_name, get_opencv_colormap
+from gui.heatmap_widgets import create_vtk_heatmap_widget
+from utils.heatmap_utils import get_colormap_name, apply_colormap_to_data
 
 class PCLChannelHeatmapModule(VisualizationModule):
     def generate_visualizations(self):
@@ -16,35 +14,24 @@ class PCLChannelHeatmapModule(VisualizationModule):
         for i, channel_name in enumerate(self.data_container.channel_names):
             channel = self.data_container.get_color_channel(i)
             colormap_name = get_colormap_name(channel_name)
-            colormap = get_opencv_colormap(colormap_name)
             
             cloud = pv.PolyData(self.data_container.points)
-            normalized = cv2.normalize(channel, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U)
-            colors = cv2.applyColorMap(normalized.reshape(-1, 1), colormap)
-            cloud['colors'] = cv2.cvtColor(colors, cv2.COLOR_BGR2RGB).squeeze()
-            
-            vtk_widget = create_qtinteractor(cloud, self.data_container)
+            cloud['colors'] = apply_colormap_to_data(channel, colormap_name)
             
             dual_axis = channel.dtype == np.uint16
             unit_converter = (lambda x: x / 1000.0) if dual_axis else None
             
-            colorbar = ColorBarWidget(
-                colormap_name, 
-                float(np.min(channel)), 
-                float(np.max(channel)), 
-                width=40, 
-                height=480,
-                dual_axis=dual_axis,
+            widget = create_vtk_heatmap_widget(
+                cloud=cloud, 
+                container=self.data_container, 
+                original_data=channel, 
+                module_name=self.get_module_name(),
+                min_val=np.min(channel), 
+                max_val=np.max(channel), 
+                colormap_name=colormap_name, 
+                dual_axis=dual_axis, 
                 unit_converter=unit_converter
             )
-            
-            widget = QWidget()
-            layout = QHBoxLayout(widget)
-            layout.setContentsMargins(0, 0, 0, 0)
-            layout.setSpacing(5)
-            layout.addWidget(vtk_widget)
-            layout.addWidget(colorbar)
-            
             results.append((f"{channel_name} Heatmap", widget))
         
         return results
