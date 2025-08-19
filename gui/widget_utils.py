@@ -8,6 +8,10 @@ import numpy as np
 
 def _create_label_from_cv2(cv2_image):
     height, width = cv2_image.shape[:2]
+    if width > 400:
+        scale = 400 / width
+        cv2_image = cv2.resize(cv2_image, (400, int(height * scale)))
+        height, width = cv2_image.shape[:2]
     
     if len(cv2_image.shape) == 3:
         bytes_per_line = 3 * width
@@ -31,8 +35,13 @@ def create_heatmap_widget(cv2_image, colormap_name, min_val, max_val, dual_axis=
     layout.setSpacing(5)
     
     image_widget = _create_label_from_cv2(cv2_image)
+    
+    height, width = cv2_image.shape[:2]
+    if width > 400:
+        height = int(height * 400 / width)
+    
     colorbar = ColorBarWidget(colormap_name, float(min_val), float(max_val), 
-                             width=40, height=cv2_image.shape[0], dual_axis=dual_axis, unit_converter=unit_converter)
+                             width=40, height=height, dual_axis=dual_axis, unit_converter=unit_converter)
     
     layout.addWidget(image_widget)
     layout.addWidget(colorbar)
