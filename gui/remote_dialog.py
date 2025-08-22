@@ -4,7 +4,7 @@ import threading
 import paramiko
 import stat
 from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QComboBox, QLineEdit, QPushButton, QLabel, QFileDialog, QMessageBox
-from PyQt6.QtCore import QTimer, pyqtSignal
+from PyQt6.QtCore import QTimer, pyqtSignal, Qt
 from core.settings import Settings
 from core.ssh_manager import SSHConnectionPool
 from gui.remote_directory_browser import RemoteDirectoryBrowser
@@ -30,7 +30,7 @@ class RemoteImageDialog(QDialog):
         self.hostname_field = self._create_field("Hostname:", layout, self._on_hostname_changed)
         self.username_field = self._create_field("Username:", layout, self._update_form)
         self.identity_file_field = self._create_file_field("Identity File:", layout)
-        self.remote_path_field = self._create_file_field("Remote Path:", layout, self._browse_remote_path)
+        self.remote_path_field, self.browse_button = self._create_file_field("Remote Path:", layout, self._browse_remote_path, return_button=True)
         
         status_layout = QHBoxLayout()
         self.status_label = QLabel("Enter hostname to check status")
@@ -42,10 +42,11 @@ class RemoteImageDialog(QDialog):
         status_layout.addStretch()
         layout.addLayout(status_layout)
         
-        self._create_buttons(layout)
+        self.connect_button, cancel_button = self._create_buttons(layout)
+        self._setup_tab_order()
         self._load_ssh_hosts()
         self._load_settings()
-        self.status_updated.connect(lambda text: (self._set_status_with_color(text), setattr(self, '_checking', False)))
+        self.status_updated.connect(lambda text: (self._set_status_with_color(text), setattr(self, '_checking', False), self._update_focus()))
         
         if self.hostname_field.text().strip():
             self._status_timer.start(100)
@@ -66,28 +67,46 @@ class RemoteImageDialog(QDialog):
         layout.addWidget(field)
         return field
     
-    def _create_file_field(self, label, layout, browse_callback=None):
+    def _create_file_field(self, label, layout, browse_callback=None, return_button=False):
         hlayout = QHBoxLayout()
         hlayout.addWidget(QLabel(label))
         field = QLineEdit()
         browse = QPushButton("Browse")
+        browse.setFocusPolicy(Qt.FocusPolicy.TabFocus)
         browse.clicked.connect(browse_callback or (lambda: self._browse_file(field)))
         hlayout.addWidget(field)
         hlayout.addWidget(browse)
         layout.addLayout(hlayout)
-        return field
+        return (field, browse) if return_button else field
     
     def _create_buttons(self, layout):
         hlayout = QHBoxLayout()
-        self.connect_button = QPushButton("Connect")
-        self.connect_button.clicked.connect(self._save_and_accept)
-        self.connect_button.setDefault(True)
+        connect_button = QPushButton("Connect")
+        connect_button.setFocusPolicy(Qt.FocusPolicy.TabFocus)
+        connect_button.clicked.connect(self._save_and_accept)
+        connect_button.setDefault(True)
         cancel = QPushButton("Cancel")
+        cancel.setFocusPolicy(Qt.FocusPolicy.TabFocus)
         cancel.clicked.connect(self.reject)
         hlayout.addStretch()
-        hlayout.addWidget(self.connect_button)
+        hlayout.addWidget(connect_button)
         hlayout.addWidget(cancel)
         layout.addLayout(hlayout)
+        return connect_button, cancel
+    
+    def _setup_tab_order(self):
+        self.setTabOrder(self.host_combo, self.hostname_field)
+        self.setTabOrder(self.hostname_field, self.username_field)
+        self.setTabOrder(self.username_field, self.identity_file_field)
+        self.setTabOrder(self.identity_file_field, self.remote_path_field)
+        self.setTabOrder(self.remote_path_field, self.browse_button)
+        self.setTabOrder(self.browse_button, self.connect_button)
+    
+    def _update_focus(self):
+        if self.status_label.text() == "Logged in":
+            self.browse_button.setFocus()
+        else:
+            self.connect_button.setFocus()
     
     def _set_status(self, text, color):
         self.status_label.setText(text)
@@ -198,22 +217,7 @@ class RemoteImageDialog(QDialog):
             return
         
         current_path = self.remote_path_field.text().strip()
-        
-        if not current_path:
-            browse_path = "/"
-        else:
-            try:
-                ssh_client = SSHConnectionPool.get_connection(self.get_connection_info())
-                sftp = ssh_client.open_sftp()
-                try:
-                    if stat.S_ISDIR(sftp.stat(current_path).st_mode):
-                        browse_path = current_path
-                    else:
-                        browse_path = "/".join(current_path.rstrip("/").split("/")[:-1]) or "/"
-                finally:
-                    sftp.close()
-            except:
-                browse_path = "/".join(current_path.rstrip("/").split("/")[:-1]) or "/"
+        browse_path = current_path or "/"
         
         browser = RemoteDirectoryBrowser(self.get_connection_info(), browse_path)
         if browser.exec() == QDialog.DialogCode.Accepted and browser.get_selected_file_path():

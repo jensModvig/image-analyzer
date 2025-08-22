@@ -8,6 +8,7 @@ from core.file_access import FileAccessManager
 from core.ssh_manager import SSHConnectionPool
 from core.remote_monitor import RemoteFileMonitor
 from core.settings import Settings
+from core.keybind_manager import KeybindManager
 from gui.grid_display import GridDisplay
 from gui.analysis_table import AnalysisTable
 from gui.remote_dialog import RemoteImageDialog
@@ -25,6 +26,7 @@ class ImageAnalyzerApp(QMainWindow):
         self.module_manager = ModuleManager()
         self.file_watcher = FileWatcher(self._reload_current_file)
         self.settings = Settings()
+        self.keybind_manager = KeybindManager(self, debug=True)
         
         self.splitter = QSplitter(Qt.Orientation.Vertical)
         self.setCentralWidget(self.splitter)
@@ -37,12 +39,16 @@ class ImageAnalyzerApp(QMainWindow):
         self.splitter.setSizes([640, 160])
         
         file_menu = self.menuBar().addMenu("File")
-        file_menu.addAction("Open Image", self._open_image)
-        file_menu.addAction("Open Remote Image", self._open_remote_image)
+        file_menu.addAction(self.keybind_manager.create_action("open_image", "Open Image", self._open_image))
+        file_menu.addAction(self.keybind_manager.create_action("open_remote_image", "Open Remote Image", self._open_remote_image))
         file_menu.addSeparator()
         file_menu.addAction("Exit", self.close)
         
         self.setAcceptDrops(True)
+    
+    def keyPressEvent(self, event):
+        if not self.keybind_manager.handle_key_event(event):
+            super().keyPressEvent(event)
     
     def dragEnterEvent(self, event):
         if event.mimeData().hasUrls():

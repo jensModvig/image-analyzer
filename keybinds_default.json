@@ -1,0 +1,12 @@
+{
+    "open_image": {
+        "windows": {"keybind": "Meta+O", "mode": "logical"},
+        "macos": {"keybind": "Ctrl+O", "mode": "logical"},
+        "linux": {"keybind": "Meta+O", "mode": "logical"}
+    },
+    "open_remote_image": {
+        "windows": {"keybind": "Meta+Shift+O", "mode": "logical"},
+        "macos": {"keybind": "Ctrl+Shift+O", "mode": "logical"},
+        "linux": {"keybind": "Meta+Shift+O", "mode": "logical"}
+    }
+}

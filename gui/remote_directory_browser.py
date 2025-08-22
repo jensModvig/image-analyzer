@@ -10,9 +10,16 @@ class RemoteDirectoryBrowser(QDialog):
     def __init__(self, connection_info, initial_path="/"):
         super().__init__()
         self.connection_info = connection_info
-        self.current_path = initial_path
         self.selected_file_path = None
         self.sftp = None
+        self.initial_file = None
+        
+        initial_path = initial_path.rstrip("/")
+        if initial_path and not initial_path.endswith("/"):
+            self.current_path = os.path.dirname(initial_path) or "/"
+            self.initial_file = os.path.basename(initial_path)
+        else:
+            self.current_path = initial_path or "/"
         
         self.setWindowTitle("Browse Remote Directory")
         self.setModal(True)
@@ -58,6 +65,15 @@ class RemoteDirectoryBrowser(QDialog):
         ssh_client = SSHConnectionPool.get_connection(connection_info)
         self.sftp = ssh_client.open_sftp()
         self._load_directory()
+        self.file_tree.setFocus()
+    
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key.Key_Return or event.key() == Qt.Key.Key_Enter:
+            current_item = self.file_tree.currentItem()
+            if current_item:
+                self._item_activated(current_item)
+                return
+        super().keyPressEvent(event)
     
     def closeEvent(self, event):
         if self.sftp:
@@ -66,7 +82,7 @@ class RemoteDirectoryBrowser(QDialog):
     
     def _natural_sort(self, paths):
         convert = lambda text: int(text) if text.isdigit() else text.lower()
-        alphanum_key = lambda path: [convert(c) for c in re.split('(\d+)', os.path.basename(str(path)))]
+        alphanum_key = lambda path: [convert(c) for c in re.split(r'(\d+)', os.path.basename(str(path)))]
         return sorted(paths, key=alphanum_key)
     
     def _load_directory(self):
@@ -91,15 +107,25 @@ class RemoteDirectoryBrowser(QDialog):
             sorted_directories = self._natural_sort([item.filename for item in directories])
             sorted_files = self._natural_sort([item.filename for item in files])
             
+            focus_item = None
             for dirname in sorted_directories:
                 tree_item = QTreeWidgetItem([dirname, "Directory"])
                 tree_item.setData(0, Qt.ItemDataRole.UserRole, "directory")
                 self.file_tree.addTopLevelItem(tree_item)
+                if self.initial_file and dirname == self.initial_file:
+                    focus_item = tree_item
             
             for filename in sorted_files:
                 tree_item = QTreeWidgetItem([filename, "Image"])
                 tree_item.setData(0, Qt.ItemDataRole.UserRole, "file")
                 self.file_tree.addTopLevelItem(tree_item)
+                if self.initial_file and filename == self.initial_file:
+                    focus_item = tree_item
+            
+            if focus_item:
+                self.file_tree.setCurrentItem(focus_item)
+                self.file_tree.scrollToItem(focus_item)
+                self.initial_file = None
         except Exception as e:
             QMessageBox.warning(self, "Error", f"Failed to load directory: {e}")
     
@@ -122,6 +148,9 @@ class RemoteDirectoryBrowser(QDialog):
         self._load_directory()
     
     def _item_double_clicked(self, item):
+        self._item_activated(item)
+    
+    def _item_activated(self, item):
         item_type = item.data(0, Qt.ItemDataRole.UserRole)
         if item_type == "directory":
             self._navigate(item.text(0))
