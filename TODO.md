@@ -1,0 +1,1 @@
+Refactor the right click functionality to have a helper to construct right click options .Right now multiple widgets implement their own as well as all nodes use the heatmap_utility to do so, when its not heatmap related
