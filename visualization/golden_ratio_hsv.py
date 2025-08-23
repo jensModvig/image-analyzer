@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+import random
 from PyQt6.QtWidgets import QMenu
 from PyQt6.QtCore import Qt
 from visualization.base import VisualizationModule
@@ -34,10 +35,10 @@ class GoldenRatioHSVModule(VisualizationModule):
             reshaped = self.data_container.original.reshape(-1, self.data_container.channels)
             unique_colors, indices = np.unique(reshaped, axis=0, return_inverse=True)
             if len(unique_colors) <= 500:
-                colors = self._generate_colors(len(unique_colors))
+                colors = self._generate_colors(len(unique_colors), indices.reshape(self.data_container.original.shape[:2]))
                 image = colors[indices].reshape(*self.data_container.original.shape[:2], 3)
                 widget = create_image_widget(image, self.get_module_name())
-                self._add_right_click_menu(widget, lambda: self._generate_colors(len(unique_colors))[indices].reshape(*self.data_container.original.shape[:2], 3))
+                self._add_right_click_menu(widget, lambda: self._generate_colors(len(unique_colors), indices.reshape(self.data_container.original.shape[:2]))[indices].reshape(*self.data_container.original.shape[:2], 3))
                 results.append(("Global Golden Ratio HSV", widget))
         
         return results
@@ -72,7 +73,7 @@ class GoldenRatioHSVModule(VisualizationModule):
         widget.setPixmap(new_label.pixmap())
     
     def _map_channel(self, channel, unique_vals):
-        colors = self._generate_colors(len(unique_vals))
+        colors = self._generate_colors(len(unique_vals), channel)
         if channel.dtype == np.uint8:
             color_map = np.zeros((256, 3), dtype=np.uint8)
             color_map[unique_vals] = colors
@@ -83,28 +84,84 @@ class GoldenRatioHSVModule(VisualizationModule):
             output[channel == val] = colors[i]
         return output
     
-    def _generate_colors(self, count):
+    def _generate_colors(self, count, labeled_image):
         if self.method == "uniform":
-            return self._generate_colors_uniform(count)
+            return self._generate_colors_uniform(count, labeled_image)
         else:
-            return self._generate_colors_endpoints(count)
+            return self._generate_colors_endpoints(count, labeled_image)
     
-    def _generate_colors_uniform(self, count):
-        hues = ((np.arange(count) * 0.618034) % 1.0) * 179
+    def _compute_normed_spatial_distances(self, labeled_image, labels):
+        n = len(labels)
+        distances = np.zeros((n, n))
+        max_spatial_dist = np.linalg.norm(labeled_image.shape[:2])
+        
+        for i in range(n):
+            mask_i = (labeled_image == labels[i]).astype(np.uint8)
+            dist_transform = cv2.distanceTransform(1 - mask_i, cv2.DIST_L2, 3)
+            
+            for j in range(i + 1, n):
+                mask_j = labeled_image == labels[j]
+                distances[i, j] = distances[j, i] = np.min(dist_transform[mask_j])
+        
+        return distances / max_spatial_dist
+    
+    def _compute_normed_color_distances(self, colors):
+        colors_hsv = cv2.cvtColor(colors.reshape(1, -1, 3), cv2.COLOR_RGB2HSV)[0]
+        hues = colors_hsv[:, 0].astype(float)
+        hue_diff = hues[:, None] - hues[None, :]
+        hue_color_distance = np.minimum(np.abs(hue_diff), 180 - np.abs(hue_diff))
+        return hue_color_distance / 90
+    
+    def _optimize_assignment(self, base_colors, labeled_image, labels, n_iterations=1000):
+        spatial_dist = self._compute_normed_spatial_distances(labeled_image, labels)
+        color_dist = self._compute_normed_color_distances(base_colors)
+        
+        best_loss = float('inf')
+        best_assignment = list(range(len(labels)))
+        
+        for _ in range(n_iterations):
+            assignment = list(range(len(labels)))
+            random.shuffle(assignment)
+            
+            loss = sum((1 - spatial_dist[i,j])**100 * (1 - color_dist[assignment[i], assignment[j]])**100 
+                    for i in range(len(labels)) for j in range(i+1, len(labels)))
+            
+            if loss < best_loss:
+                best_loss = loss
+                best_assignment = assignment
+        
+        print(best_loss)
+        
+        return base_colors[best_assignment]
+    
+    def _generate_uniform_colors(self, count):
+        """Generate count uniform colors using golden ratio spacing"""
+        hues = np.linspace(0, 179, count)
         hsv = np.stack([hues, np.full(count, 204), np.full(count, 230)], axis=-1).astype(np.uint8)
         return cv2.cvtColor(hsv.reshape(-1, 1, 3), cv2.COLOR_HSV2RGB).reshape(-1, 3)
-    
-    def _generate_colors_endpoints(self, count):
-        colors = np.zeros((count, 3), dtype=np.uint8)
+
+    def _generate_colors_uniform(self, count, labeled_image):
+        colors = self._generate_uniform_colors(count)
+        labels = np.unique(labeled_image)
+        return self._optimize_assignment(colors, labeled_image, labels)
+
+    def _generate_colors_endpoints(self, count, labeled_image):
         if count == 1:
-            colors[0] = (128, 128, 128)
-        else:
-            colors[0] = (0, 0, 0)
-            colors[-1] = (255, 255, 255)
-            if count > 2:
-                hues = ((np.arange(count - 2) * 0.618034) % 1.0) * 179
-                hsv = np.stack([hues, np.full(count - 2, 204), np.full(count - 2, 230)], axis=-1).astype(np.uint8)
-                colors[1:-1] = cv2.cvtColor(hsv.reshape(-1, 1, 3), cv2.COLOR_HSV2RGB).reshape(-1, 3)
+            return np.array([[128, 128, 128]], dtype=np.uint8)
+        
+        labels = np.unique(labeled_image)
+        labels = labels[labels >= 0][:count]
+        
+        colors = np.zeros((count, 3), dtype=np.uint8)
+        colors[0] = (0, 0, 0) 
+        colors[-1] = (255, 255, 255)
+        
+        if count > 2:
+            middle_colors = self._generate_uniform_colors(count - 2)
+            middle_labels = labels[1:-1]
+            optimized_middle = self._optimize_assignment(middle_colors, labeled_image, middle_labels)
+            colors[1:-1] = optimized_middle
+        
         return colors
     
     def get_module_name(self):

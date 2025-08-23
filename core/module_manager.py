@@ -38,22 +38,16 @@ class ModuleManager:
         visualizations = []
         
         for module_class in self.visualization_modules:
-            try:
-                if type(container) in module_class.get_supported_containers():
-                    module = module_class(container)
-                    visualizations.extend(module.generate_visualizations())
-            except Exception as e:
-                print(f"Error in {module_class.__name__}: {e}")
+            if type(container) in module_class.get_supported_containers():
+                module = module_class(container)
+                visualizations.extend(module.generate_visualizations())
         return visualizations
     
     def get_properties(self, container):
         properties = []
         
         for module_class in self.analysis_modules:
-            try:
-                if type(container) in module_class.get_supported_containers():
-                    module = module_class(container)
-                    properties.extend(module.extract_properties())
-            except Exception as e:
-                print(f"Error in {module_class.__name__}: {e}")
+            if type(container) in module_class.get_supported_containers():
+                module = module_class(container)
+                properties.extend(module.extract_properties())
         return properties
