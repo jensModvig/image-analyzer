@@ -73,7 +73,7 @@ class GoldenRatioHSVModule(VisualizationModule):
         widget.setPixmap(new_label.pixmap())
     
     def _map_channel(self, channel, unique_vals):
-        colors = self._generate_colors(len(unique_vals), channel)
+        colors = self._generate_colors(8, channel)
         if channel.dtype == np.uint8:
             color_map = np.zeros((256, 3), dtype=np.uint8)
             color_map[unique_vals] = colors
@@ -112,33 +112,63 @@ class GoldenRatioHSVModule(VisualizationModule):
         hue_color_distance = np.minimum(np.abs(hue_diff), 180 - np.abs(hue_diff))
         return hue_color_distance / 90
     
-    def _optimize_assignment(self, base_colors, labeled_image, labels, n_iterations=1000):
+    def _optimize_assignment(self, base_colors, labeled_image, labels, n_iterations=100):
         spatial_dist = self._compute_normed_spatial_distances(labeled_image, labels)
         color_dist = self._compute_normed_color_distances(base_colors)
+        n_labels = len(labels)
         
-        best_loss = float('inf')
-        best_assignment = list(range(len(labels)))
+        def total_loss(assignment):
+            return sum((1 - spatial_dist[i,j])**100 * (1 - color_dist[assignment[i], assignment[j]])**2 
+                    for i in range(n_labels) for j in range(i+1, n_labels))
+        
+        best_assignment = list(range(n_labels))
+        best_loss = total_loss(best_assignment)
         
         for _ in range(n_iterations):
-            c = len(labels)
-            assignment = list(range(c))
+            assignment = list(range(n_labels))
             random.shuffle(assignment)
-
-            loss = sum((1 - spatial_dist[i,j])**100 * (1 - color_dist[assignment[i], assignment[j]])**2 
-                    for i in range(len(labels)) for j in range(i+1, len(labels)))
-            
+            loss = total_loss(assignment)
             if loss < best_loss:
                 best_loss = loss
                 best_assignment = assignment
         
-        print(best_loss)
+        def blob_loss(blob_idx, assignment):
+            return sum((1 - spatial_dist[blob_idx, j])**100 * (1 - color_dist[assignment[blob_idx], assignment[j]])**2 
+                    for j in range(n_labels) if j != blob_idx)
+        
+        for _ in range(500):
+            improved = False
+            
+            for _ in range(n_labels):
+                blob_losses = [(blob_loss(i, best_assignment), i) for i in range(n_labels)]
+                if not blob_losses:
+                    break
+                _, blob_idx = max(blob_losses)
+                current_loss = total_loss(best_assignment)
+                best_color = best_assignment[blob_idx]
+                
+                for color_idx in range(len(base_colors)):
+                    if color_idx != best_assignment[blob_idx]:
+                        test_assignment = best_assignment[:]
+                        test_assignment[blob_idx] = color_idx
+                        test_loss = total_loss(test_assignment)
+                        if test_loss < current_loss:
+                            current_loss = test_loss
+                            best_color = color_idx
+                
+                if best_color != best_assignment[blob_idx]:
+                    best_assignment[blob_idx] = best_color
+                    improved = True
+            
+            if not improved:
+                break
         
         return base_colors[best_assignment]
     
     def _generate_uniform_colors(self, count):
         """Generate count uniform colors using golden ratio spacing"""
         hues = np.linspace(0, 180, count+1)[:-1]
-        hsv = np.stack([hues, np.full(count, 204), np.full(count, 230)], axis=-1).astype(np.uint8)
+        hsv = np.stack([hues, np.full(count, 255), np.full(count, 255)], axis=-1).astype(np.uint8)
         return cv2.cvtColor(hsv.reshape(-1, 1, 3), cv2.COLOR_HSV2RGB).reshape(-1, 3)
 
     def _generate_colors_uniform(self, count, labeled_image):
