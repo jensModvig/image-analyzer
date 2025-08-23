@@ -120,10 +120,11 @@ class GoldenRatioHSVModule(VisualizationModule):
         best_assignment = list(range(len(labels)))
         
         for _ in range(n_iterations):
-            assignment = list(range(len(labels)))
+            c = len(labels)
+            assignment = list(range(c))
             random.shuffle(assignment)
-            
-            loss = sum((1 - spatial_dist[i,j])**100 * (1 - color_dist[assignment[i], assignment[j]])**100 
+
+            loss = sum((1 - spatial_dist[i,j])**100 * (1 - color_dist[assignment[i], assignment[j]])**2 
                     for i in range(len(labels)) for j in range(i+1, len(labels)))
             
             if loss < best_loss:
@@ -136,7 +137,7 @@ class GoldenRatioHSVModule(VisualizationModule):
     
     def _generate_uniform_colors(self, count):
         """Generate count uniform colors using golden ratio spacing"""
-        hues = np.linspace(0, 179, count)
+        hues = np.linspace(0, 180, count+1)[:-1]
         hsv = np.stack([hues, np.full(count, 204), np.full(count, 230)], axis=-1).astype(np.uint8)
         return cv2.cvtColor(hsv.reshape(-1, 1, 3), cv2.COLOR_HSV2RGB).reshape(-1, 3)
 
