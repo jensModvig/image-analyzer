@@ -73,7 +73,7 @@ class GoldenRatioHSVModule(VisualizationModule):
         widget.setPixmap(new_label.pixmap())
     
     def _map_channel(self, channel, unique_vals):
-        colors = self._generate_colors(8, channel)
+        colors = self._generate_colors(len(unique_vals), channel)
         if channel.dtype == np.uint8:
             color_map = np.zeros((256, 3), dtype=np.uint8)
             color_map[unique_vals] = colors
