@@ -122,7 +122,7 @@ class NPZLoader(FileLoader):
         
         coord_table = QTableWidget(len(keys), 4)
         coord_table.setHorizontalHeaderLabels(["Coordinates", "Color", "Focal", "Matrix"])
-        
+
         coord_group = QButtonGroup()
         color_group = QButtonGroup()
         focal_group = QButtonGroup()
@@ -239,11 +239,11 @@ class NPZLoader(FileLoader):
                 (array.shape == () or (len(array.shape) == 1 and array.shape[0] == 1)))
     
     def _is_valid_matrix(self, array):
-        return (isinstance(array, np.ndarray) and 
+        return (isinstance(array, np.ndarray) and
                 np.issubdtype(array.dtype, np.number) and
                 len(array.shape) == 2 and
                 array.shape in [(3, 3), (3, 4), (4, 4)])
-    
+
     def _project_depth(self, data, selection):
         from utils.depth_projection import project_depth_to_pointcloud
         
@@ -252,7 +252,7 @@ class NPZLoader(FileLoader):
         intrinsic_matrix = data[selection['matrix']] if selection['matrix'] else None
         
         points, mask = project_depth_to_pointcloud(depth_array, focal_length, intrinsic_matrix)
-        
+
         pcd = o3d.geometry.PointCloud()
         pcd.points = o3d.utility.Vector3dVector(points)
         
