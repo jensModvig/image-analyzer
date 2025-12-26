@@ -1,4 +1,4 @@
-from PyQt6.QtWidgets import QMainWindow, QSplitter, QFileDialog
+from PyQt6.QtWidgets import QMainWindow, QSplitter, QFileDialog, QMenu
 from PyQt6.QtCore import Qt, QTimer
 from file_loaders import get_loader, get_all_extensions
 from file_loaders.npz_loader import NPZLoader
@@ -12,6 +12,7 @@ from core.keybind_manager import KeybindManager
 from gui.grid_display import GridDisplay
 from gui.analysis_table import AnalysisTable
 from gui.remote_dialog import RemoteImageDialog
+from gui.widget_utils import cursor_signals
 
 class ImageAnalyzerApp(QMainWindow):
     def __init__(self):
@@ -37,13 +38,22 @@ class ImageAnalyzerApp(QMainWindow):
         self.splitter.addWidget(self.grid_display)
         self.splitter.addWidget(self.analysis_table)
         self.splitter.setSizes([640, 160])
+        cursor_signals.cursor_info.connect(self.analysis_table.set_cursor_info)
         
         file_menu = self.menuBar().addMenu("File")
         file_menu.addAction(self.keybind_manager.create_action("open_image", "Open Image", self._open_image))
         file_menu.addAction(self.keybind_manager.create_action("open_remote_image", "Open Remote Image", self._open_remote_image))
         file_menu.addSeparator()
         file_menu.addAction("Exit", self.close)
-        
+
+        anim_menu = self.menuBar().addMenu("Animation")
+        anim_menu.addAction("Add Keyframe (K)", self._anim_add_keyframe)
+        anim_menu.addAction("Play/Pause (P)", self._anim_toggle)
+        anim_menu.addAction("Clear Keyframes", self._anim_clear)
+        anim_menu.addSeparator()
+        anim_menu.addAction("Save Animation...", self._anim_save)
+        anim_menu.addAction("Load Animation...", self._anim_load)
+
         self.setAcceptDrops(True)
     
     def keyPressEvent(self, event):
@@ -113,6 +123,44 @@ class ImageAnalyzerApp(QMainWindow):
             self.data_container.reload()
             self._analyze_image()
     
+    def _get_active_animation(self):
+        from PyQt6.QtWidgets import QWidget
+        for widget in self.grid_display.findChildren(QWidget):
+            if hasattr(widget, 'animation_controller'):
+                print(f"Found animation controller with {len(widget.animation_controller.keyframes)} keyframes")
+                return widget.animation_controller
+        print("No animation controller found")
+        return None
+
+    def _anim_add_keyframe(self):
+        anim = self._get_active_animation()
+        if anim:
+            anim.add_keyframe()
+
+    def _anim_toggle(self):
+        anim = self._get_active_animation()
+        if anim:
+            anim.toggle()
+
+    def _anim_clear(self):
+        anim = self._get_active_animation()
+        if anim:
+            anim.clear()
+
+    def _anim_save(self):
+        anim = self._get_active_animation()
+        if anim:
+            path, _ = QFileDialog.getSaveFileName(self, "Save Animation", "", "JSON (*.json);;Text (*.txt)")
+            if path:
+                anim.save(path)
+
+    def _anim_load(self):
+        anim = self._get_active_animation()
+        if anim:
+            path, _ = QFileDialog.getOpenFileName(self, "Load Animation", "", "JSON (*.json);;Text (*.txt)")
+            if path:
+                anim.load(path)
+
     def closeEvent(self, event):
         self.file_watcher.stop_watching()
         SSHConnectionPool.cleanup()
